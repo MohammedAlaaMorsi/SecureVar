@@ -84,10 +84,25 @@
 # Kotlin metadata for reflection
 -keep class kotlin.Metadata { *; }
 
-# Keep property references
+# Keep property references - CRITICAL for SecureVarDelegate reflection
 -keepclassmembers class * {
     ** get*();
     void set*(***);
+    boolean is*();
+}
+
+# Keep all property descriptors used by Kotlin reflection
+-keep class kotlin.reflect.jvm.internal.** { *; }
+-keep class kotlin.reflect.** { *; }
+
+# Preserve property names for classes using SecureVarDelegate
+-keepclassmembers class * {
+    @kotlin.jvm.JvmField io.mohammedalaamorsi.trckq.SecureVarDelegate *;
+}
+
+# Keep all methods that might be accessed via reflection by SecureVarDelegate
+-keepclassmembers class * {
+    *** *$delegate;
 }
 
 # Kotlin coroutines

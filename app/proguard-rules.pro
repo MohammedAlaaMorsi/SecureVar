@@ -69,6 +69,25 @@
     public *;
 }
 
+# Keep SessionManager and its properties (uses SecureVarDelegate)
+-keep class io.mohammedalaamorsi.trckqapp.domain.manager.SessionManager {
+    public *;
+    private io.mohammedalaamorsi.trckq.SecureVarDelegate *;
+}
+
+# Keep all property getters/setters for classes using SecureVarDelegate
+-keepclassmembers class io.mohammedalaamorsi.trckqapp.domain.manager.** {
+    *** getUsername();
+    void setUsername(***);
+    *** getUserId();
+    void setUserId(***);
+    *** isPremiumUser();
+    void setPremiumUser(***);
+    boolean is*();
+    *** get*();
+    void set*(***);
+}
+
 # ===========================
 # Kotlin Rules
 # ===========================
