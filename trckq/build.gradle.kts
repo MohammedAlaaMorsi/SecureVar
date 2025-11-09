@@ -38,7 +38,7 @@ dependencies {
     implementation(libs.material)
     
     // Kotlin reflection for delegate access
-    implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.20")
+    implementation(libs.kotlin.reflect)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
