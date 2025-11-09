@@ -1,0 +1,457 @@
+# TrckQ - Secure Variable Library for Android
+
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple.svg)](https://kotlinlang.org)
+
+**TrckQ** is a production-grade Android security library that provides **re-sealable secure variables** with server-authorized write control. Variables are protected by multiple cryptographic layers and can only be modified with time-limited, one-time-use write keys issued by your backend.
+
+## 🎯 Core Concept
+
+Traditional variable protection approaches use read-only properties or obfuscation. TrckQ takes a different approach:
+
+- **Variables are writable**, but only through cryptographically validated authorization
+- **Server controls all writes** via time-limited, one-time-use WriteKeys
+- **Multi-layer protection** prevents tampering, replay attacks, and unauthorized modifications
+- **Zero-trust architecture** assumes the client is compromised and validates everything
+
+## 🔐 Security Architecture
+
+### Multi-Layer Defense
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Application Layer                        │
+│  ┌────────────┐                      ┌─────────────────┐   │
+│  │ SessionMgr │──────────────────────│  SecureVar<T>  │   │
+│  └────────────┘                      └─────────────────┘   │
+│         │                                     │              │
+│         │ authorizedWrite(value, WriteKey)   │              │
+│         └────────────────────────────────────┘              │
+└─────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Authorization Layer (WriteKey)                  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  • Nonce (one-time use) + Timestamp + TTL           │  │
+│  │  • HMAC-SHA256 or ECDSA signature                   │  │
+│  │  • Bound to: userId, propertyName, scope            │  │
+│  │  • Replay prevention via nonce store + MAC          │  │
+│  │  • Risk posture enforcement (debugger/root/hook)    │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Sealing Layer (SecureVarDelegate)               │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  • AES-GCM-128 encryption (per-instance key)        │  │
+│  │  • HMAC-SHA256 MAC (propertyName:salt:IV:cipher)    │  │
+│  │  • Checksum fallback                                 │  │
+│  │  • Obfuscation (split + noise)                      │  │
+│  │  • Per-instance salt (prevents cross-instance reuse)│  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Runtime Protection Layer                        │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  • Stack trace origin verification                   │  │
+│  │  • Rate limiting (10 writes/min per variable)       │  │
+│  │  • Tamper detection & alerts                         │  │
+│  │  • Direct assignment rejection                       │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Secret Management Layer                         │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  • Per-install random secrets (MAC + ENC)           │  │
+│  │  • AndroidX EncryptedSharedPreferences              │  │
+│  │  • MasterKey (AES256_GCM)                           │  │
+│  │  • Dynamic secret provisioning via SecretProvider   │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Security Features
+
+#### 1. **Server-Issued Authorization (WriteKey)**
+- **One-time use**: Nonces are tracked and rejected on replay
+- **Time-limited**: TTL enforcement with configurable clock skew tolerance
+- **Cryptographically signed**: HMAC-SHA256 or ECDSA (asymmetric preferred)
+- **Context-bound**: Signatures include userId, propertyName, and scope
+- **Risk-aware**: High-risk environments (debugger/root) require asymmetric signatures
+
+#### 2. **Local Sealing (SecureVarDelegate)**
+- **AES-GCM encryption**: 128-bit authentication tag, unique IV per write
+- **Per-instance keys**: Derived from `SHA-256(encSecret:propertyName:instanceSalt)`
+- **MAC protection**: HMAC-SHA256 over `propertyName:instanceSalt:IV:ciphertext`
+- **Tamper detection**: MAC + checksum dual verification
+- **Obfuscation**: Split value + random noise for additional depth
+
+#### 3. **Replay Prevention**
+- **Nonce store**: Persistent encrypted SharedPreferences
+- **Integrity MAC**: HMAC over canonical nonce list (detects store tampering)
+- **Automatic cleanup**: Expired nonces pruned on validation
+
+#### 4. **Runtime Protection**
+- **Origin enforcement**: Stack trace verification (allowed package prefixes)
+- **Rate limiting**: Configurable per-variable write throttling (default: 10/min)
+- **Direct assignment rejection**: `setValue()` triggers tamper alert and ignores write
+
+#### 5. **Dynamic Secret Management**
+- **Per-install secrets**: Random 32-byte Base64 secrets generated once
+- **Encrypted storage**: AndroidX Security Crypto (EncryptedSharedPreferences)
+- **MasterKey**: AES256_GCM with AndroidKeyStore backing
+- **SecretProvider**: Runtime interface for MAC/ENC secret retrieval
+
+## 📦 Installation
+
+### 1. Add the library module to your project
+
+```kotlin
+// settings.gradle.kts
+include(":trckq")
+```
+
+### 2. Add dependency to your app module
+
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    implementation(project(":trckq"))
+    
+    // Required for secret management
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+}
+```
+
+## 🚀 Quick Start
+
+### 1. Initialize TrckQ in your Application class
+
+```kotlin
+class TrckQApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        
+        // Create encrypted secret storage
+        val masterKey = MasterKey.Builder(this)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
+        val encryptedPrefs = EncryptedSharedPreferences.create(
+            this,
+            "trckq_secrets",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+
+        // Generate or retrieve persistent secrets
+        val macSecret = encryptedPrefs.getString("mac_secret", null) ?: run {
+            val secret = generateSecret()
+            encryptedPrefs.edit().putString("mac_secret", secret).apply()
+            secret
+        }
+
+        val encSecret = encryptedPrefs.getString("enc_secret", null) ?: run {
+            val secret = generateSecret()
+            encryptedPrefs.edit().putString("enc_secret", secret).apply()
+            secret
+        }
+
+        // Initialize TrckQ
+        TrckqManager.initialize(
+            TrckqConfig(
+                action = TrckqAction.Alert("https://your-backend.com/security/alert"),
+                secretProvider = object : SecretProvider {
+                    override fun getMacSecret(): String = macSecret
+                    override fun getEncSecret(propertyName: String): String = encSecret
+                }
+            )
+        )
+    }
+
+    private fun generateSecret(): String {
+        val bytes = ByteArray(32)
+        java.security.SecureRandom().nextBytes(bytes)
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+    }
+}
+```
+
+### 2. Define secure variables in your data class
+
+```kotlin
+class SessionManager {
+    // Delegate pattern: property backed by SecureVarDelegate
+    private val isPremiumUserDelegate = SecureVarDelegate(
+        initialValue = false,
+        propertyName = "isPremiumUser"
+    )
+    
+    var isPremiumUser: Boolean
+        get() = isPremiumUserDelegate.getValue(this, ::isPremiumUser)
+        private set(value) {
+            // Direct assignment is FORBIDDEN and will be ignored
+            isPremiumUserDelegate.setValue(this, ::isPremiumUser, value)
+        }
+
+    private val usernameDelegate = SecureVarDelegate(
+        initialValue = "",
+        propertyName = "username"
+    )
+    
+    var username: String
+        get() = usernameDelegate.getValue(this, ::usernameDelegate)
+        private set(value) {
+            usernameDelegate.setValue(this, ::usernameDelegate, value)
+        }
+
+    // Authorized write method - ONLY way to update secure variables
+    suspend fun upgradeUserToPremium(userId: String) {
+        // 1. Request WriteKey from your backend
+        val writeKey = UserApi.requestPremiumUpgrade(userId)
+        
+        // 2. Validate and apply with authorizedWrite
+        isPremiumUserDelegate.authorizedWrite(
+            newValue = true,
+            key = writeKey
+        )
+    }
+
+    suspend fun updateUsername(userId: String, newUsername: String) {
+        val writeKey = UserApi.requestUsernameChange(userId, newUsername)
+        usernameDelegate.authorizedWrite(
+            newValue = newUsername,
+            key = writeKey
+        )
+    }
+}
+```
+
+### 3. Backend: Issue WriteKeys
+
+```kotlin
+// Backend API example (Node.js/Express)
+app.post('/api/writekey/premium-upgrade', async (req, res) => {
+    const { userId } = req.body;
+    
+    // Validate user is authorized for premium upgrade
+    if (!await canUpgradeToPremium(userId)) {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    // Generate WriteKey
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const timestamp = Date.now();
+    const ttlMillis = 5 * 60 * 1000; // 5 minutes
+    const propertyName = 'isPremiumUser';
+    const scope = 'premium_upgrade';
+    
+    // Create HMAC signature
+    const message = `${nonce}:${timestamp}:${userId}:${propertyName}:${scope}`;
+    const hmacSignature = crypto
+        .createHmac('sha256', process.env.APP_SECRET_KEY)
+        .update(message)
+        .digest('base64');
+    
+    // Optional: Create ECDSA signature for high-security scenarios
+    const sign = crypto.createSign('SHA256');
+    sign.update(message);
+    const asymSignature = sign.sign(privateKey, 'base64');
+    
+    res.json({
+        nonce,
+        timestamp,
+        signature: hmacSignature,
+        asymSignature,
+        ttlMillis,
+        userId,
+        propertyName,
+        scope
+    });
+});
+```
+
+### 4. Client: Request and apply WriteKey
+
+```kotlin
+object UserApi {
+    suspend fun requestPremiumUpgrade(userId: String): WriteKey {
+        val response = httpClient.post("https://your-backend.com/api/writekey/premium-upgrade") {
+            setBody(json { "userId" to userId })
+        }
+        val data = response.body<JsonObject>()
+        
+        return WriteKey(
+            nonce = data["nonce"].asString,
+            timestamp = data["timestamp"].asLong,
+            signature = data["signature"]?.asString,
+            asymSignature = data["asymSignature"]?.asString,
+            ttlMillis = data["ttlMillis"]?.asLong ?: 300_000L,
+            userId = data["userId"]?.asString,
+            propertyName = data["propertyName"]?.asString,
+            scope = data["scope"]?.asString
+        )
+    }
+}
+```
+
+## 🔬 Advanced Usage
+
+### Custom Tamper Detection
+
+```kotlin
+TrckqManager.initialize(
+    TrckqConfig(
+        action = TrckqAction.Logout, // Logout user on tamper detection
+        secretProvider = mySecretProvider
+    )
+)
+```
+
+### Risk Posture Configuration
+
+```kotlin
+// In WriteKeyValidator, configure risk detection
+WriteKeyValidator.apply {
+    // Force high-risk mode for testing
+    forceHighRisk(true)
+    
+    // Configure public key for asymmetric verification
+    setPublicKey(yourECDSAPublicKey)
+}
+```
+
+### Rate Limiting Configuration
+
+```kotlin
+class SecureVarDelegate<T>(
+    initialValue: T,
+    propertyName: String,
+    private val writeLimitPerMinute: Int = 20 // Custom limit
+) : ReadWriteProperty<Any?, T> {
+    // ... implementation
+}
+```
+
+## 🧪 Testing
+
+### Run Unit Tests
+
+```bash
+./gradlew :trckq:test
+```
+
+### Run Instrumented Tests
+
+```bash
+./gradlew :trckq:connectedDebugAndroidTest
+```
+
+### Test Coverage
+
+- ✅ WriteKey validation (nonce, timestamp, signature, replay)
+- ✅ MAC tamper detection
+- ✅ Rate limiting enforcement
+- ✅ Origin verification (stack trace)
+- ✅ Asymmetric signature verification
+- ✅ Nonce store integrity (MAC protection)
+- ✅ Instance collision prevention (same propertyName across delegates)
+
+## 📊 Performance Characteristics
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| `getValue()` | ~0.5ms | AES-GCM decrypt + MAC verify |
+| `authorizedWrite()` | ~2-5ms | WriteKey validation + encryption |
+| WriteKey validation | ~1-3ms | HMAC or ECDSA verify + nonce check |
+| Nonce store MAC | ~0.5ms | HMAC over canonical nonce list |
+
+## 🛡️ Threat Model
+
+### Protected Against
+
+✅ **Memory inspection**: Variables encrypted at rest  
+✅ **Direct assignment**: `setValue()` rejected, triggers alert  
+✅ **Replay attacks**: Nonce tracking prevents reuse  
+✅ **Tampering**: MAC + checksum detect modifications  
+✅ **Time manipulation**: TTL + clock skew enforcement  
+✅ **Unauthorized origins**: Stack trace verification  
+✅ **Rate abuse**: Per-variable write throttling  
+✅ **Cross-instance state injection**: Per-instance salt prevents key reuse  
+✅ **Nonce store tampering**: Integrity MAC detects modifications  
+
+### Limitations
+
+⚠️ **Root access**: Root users can bypass AndroidKeyStore protections  
+⚠️ **Frida/Xposed**: Runtime hooks can intercept method calls (mitigated by risk posture checks)  
+⚠️ **Physical device access**: Attacker with physical access can extract keys from KeyStore  
+⚠️ **Stack trace spoofing**: Advanced attackers may forge stack traces (rare)  
+
+## 🔧 Configuration Options
+
+### TrckqConfig
+
+```kotlin
+data class TrckqConfig(
+    val action: TrckqAction,           // Alert | Logout | Crash
+    val secretProvider: SecretProvider? // MAC/ENC secret source
+)
+```
+
+### TrckqAction
+
+```kotlin
+sealed class TrckqAction {
+    data class Alert(val url: String) : TrckqAction()  // Send alert to backend
+    object Logout : TrckqAction()                      // Force user logout
+    object Crash : TrckqAction()                       // Crash app immediately
+}
+```
+
+### SecretProvider
+
+```kotlin
+interface SecretProvider {
+    fun getMacSecret(): String                    // MAC key for HMAC operations
+    fun getEncSecret(propertyName: String): String // Base secret for AES key derivation
+}
+```
+
+## 📚 Documentation
+
+- [Security Architecture](docs/SECURITY.md) - Detailed threat model and cryptographic design
+- [API Reference](docs/API.md) - Complete API documentation
+- [Migration Guide](docs/MIGRATION.md) - Upgrading from previous versions
+- [Best Practices](docs/BEST_PRACTICES.md) - Security recommendations
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## 📄 License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- AndroidX Security Crypto for encrypted storage
+- Kotlin coroutines for async operations
+- JUnit and AndroidX Test for testing framework
+
+## 🔗 Links
+
+- [GitHub Repository](https://github.com/mohammedalaamorsi/TrckQ)
+- [Issue Tracker](https://github.com/mohammedalaamorsi/TrckQ/issues)
+- [Discussions](https://github.com/mohammedalaamorsi/TrckQ/discussions)
+
+---
+
+**Built with ❤️ for Android security**
