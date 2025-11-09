@@ -32,6 +32,7 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
+            signingConfig = signingConfigs.getByName("debug")  // Use debug keystore for release too (for development)
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

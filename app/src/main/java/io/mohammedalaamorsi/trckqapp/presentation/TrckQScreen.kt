@@ -156,7 +156,7 @@ fun LoggedInContent(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Divider()
+            HorizontalDivider()
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
