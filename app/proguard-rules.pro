@@ -133,6 +133,10 @@
 # Keep SecureRandom
 -keep class java.security.SecureRandom { *; }
 
+# Suppress warnings for missing annotations
+-dontwarn javax.annotation.**
+-dontwarn javax.annotation.concurrent.**
+
 # ===========================
 # Testing & Debug
 # ===========================
@@ -163,11 +167,6 @@
 -dontusemixedcaseclassnames
 -dontskipnonpubliclibraryclasses
 -verbose
-
-# Obfuscation dictionary for better name obfuscation
--obfuscationdictionary proguard-dict.txt
--classobfuscationdictionary proguard-dict.txt
--packageobfuscationdictionary proguard-dict.txt
 
 # Remove debug info but keep line numbers for crash reports
 -keepattributes SourceFile,LineNumberTable

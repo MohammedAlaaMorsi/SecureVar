@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
  * ViewModel for the main screen
  * Handles UI state and business logic coordination
  */
-class MainViewModel(
+class TrckQViewModel(
     private val sessionManager: SessionManager,
     private val loginUseCase: LoginUseCase,
     private val purchaseSubscriptionUseCase: PurchaseSubscriptionUseCase,

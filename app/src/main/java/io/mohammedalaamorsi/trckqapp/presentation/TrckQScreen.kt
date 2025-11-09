@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun TrckQScreen(viewModel: TrckQViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val message by viewModel.message.collectAsState()
 
@@ -46,17 +46,17 @@ fun MainScreen(viewModel: MainViewModel) {
             )
 
             when (val state = uiState) {
-                is MainViewModel.UiState.LoggedOut -> {
+                is TrckQViewModel.UiState.LoggedOut -> {
                     LoggedOutContent(
                         onLogin = { email, password ->
                             viewModel.login(email, password)
                         }
                     )
                 }
-                is MainViewModel.UiState.Loading -> {
+                is TrckQViewModel.UiState.Loading -> {
                     LoadingContent()
                 }
-                is MainViewModel.UiState.LoggedIn -> {
+                is TrckQViewModel.UiState.LoggedIn -> {
                     LoggedInContent(
                         username = state.username,
                         isPremium = state.isPremium,
@@ -65,7 +65,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onAttemptHack = { viewModel.attemptHack() }
                     )
                 }
-                is MainViewModel.UiState.Error -> {
+                is TrckQViewModel.UiState.Error -> {
                     ErrorContent(message = state.message)
                 }
             }

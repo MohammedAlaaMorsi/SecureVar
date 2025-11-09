@@ -9,7 +9,7 @@ import android.content.Context
 import io.mohammedalaamorsi.trckqapp.domain.usecase.LoginUseCase
 import io.mohammedalaamorsi.trckqapp.domain.usecase.PurchaseSubscriptionUseCase
 import io.mohammedalaamorsi.trckqapp.domain.usecase.RefreshUserStatusUseCase
-import io.mohammedalaamorsi.trckqapp.presentation.MainViewModel
+import io.mohammedalaamorsi.trckqapp.presentation.TrckQViewModel
 
 /**
  * Simple Dependency Injection container
@@ -30,8 +30,8 @@ class AppContainer(private val appContext: Context) {
         RefreshUserStatusUseCase(sessionManager)
     
     // Presentation Layer
-    fun createMainViewModel(): MainViewModel {
-        return MainViewModel(
+    fun createTrckQViewModel(): TrckQViewModel {
+        return TrckQViewModel(
             sessionManager = sessionManager,
             loginUseCase = loginUseCase,
             purchaseSubscriptionUseCase = purchaseSubscriptionUseCase,
