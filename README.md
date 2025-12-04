@@ -70,8 +70,9 @@ Traditional variable protection approaches use read-only properties or obfuscati
 │              Secret Management Layer                         │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  • Per-install random secrets (MAC + ENC)           │  │
-│  │  • AndroidX EncryptedSharedPreferences              │  │
-│  │  • MasterKey (AES256_GCM)                           │  │
+│  │  • Google Tink AEAD encryption                      │  │
+│  │  • Android Keystore backing                         │  │
+│  │  • DataStore with encrypted storage                 │  │
 │  │  • Dynamic secret provisioning via SecretProvider   │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
@@ -105,8 +106,9 @@ Traditional variable protection approaches use read-only properties or obfuscati
 
 #### 5. **Dynamic Secret Management**
 - **Per-install secrets**: Random 32-byte Base64 secrets generated once
-- **Encrypted storage**: AndroidX Security Crypto (EncryptedSharedPreferences)
-- **MasterKey**: AES256_GCM with AndroidKeyStore backing
+- **Encrypted storage**: Google Tink AEAD with AES256-GCM
+- **Hardware-backed**: Android Keystore integration
+- **DataStore**: Modern async preferences with encryption layer
 - **SecretProvider**: Runtime interface for MAC/ENC secret retrieval
 
 ## 📦 Installation
@@ -125,8 +127,9 @@ include(":trckq")
 dependencies {
     implementation(project(":trckq"))
     
-    // Required for secret management
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // Required for encrypted storage
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("com.google.crypto.tink:tink-android:1.15.0")
 }
 ```
 
@@ -136,51 +139,56 @@ dependencies {
 
 ```kotlin
 class TrckQApplication : Application() {
+    private val dataStore by preferencesDataStore(name = "trckq_secrets")
+    
     override fun onCreate() {
         super.onCreate()
         
-        // Create encrypted secret storage
-        val masterKey = MasterKey.Builder(this)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-
-        val encryptedPrefs = EncryptedSharedPreferences.create(
-            this,
-            "trckq_secrets",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-
-        // Generate or retrieve persistent secrets
-        val macSecret = encryptedPrefs.getString("mac_secret", null) ?: run {
-            val secret = generateSecret()
-            encryptedPrefs.edit().putString("mac_secret", secret).apply()
-            secret
-        }
-
-        val encSecret = encryptedPrefs.getString("enc_secret", null) ?: run {
-            val secret = generateSecret()
-            encryptedPrefs.edit().putString("enc_secret", secret).apply()
-            secret
-        }
-
-        // Initialize TrckQ
+        // Initialize Tink encryption
+        EncryptedDataStore.initialize(this)
+        
+        // Initialize TrckQ with encrypted secret provider
         TrckqManager.initialize(
             TrckqConfig(
                 action = TrckqAction.Alert("https://your-backend.com/security/alert"),
                 secretProvider = object : SecretProvider {
-                    override fun getMacSecret(): String = macSecret
-                    override fun getEncSecret(propertyName: String): String = encSecret
+                    override fun getMacSecret(): String = getOrCreateSecret("mac_secret")
+                    override fun getEncSecret(propertyName: String): String = getOrCreateSecret("enc_secret")
+                    
+                    private fun getOrCreateSecret(key: String): String = runBlocking {
+                        val prefKey = stringPreferencesKey(key)
+                        val encrypted = dataStore.data.map { it[prefKey] }.first()
+                        
+                        if (encrypted != null) {
+                            // Decrypt existing secret
+                            return@runBlocking EncryptedDataStore.decrypt(encrypted, this@TrckQApplication)
+                        }
+                        
+                        // Generate new secret
+                        val bytes = ByteArray(32)
+                        java.security.SecureRandom().nextBytes(bytes)
+                        val plaintext = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                        
+                        // Encrypt and store
+                        val encryptedValue = EncryptedDataStore.encrypt(plaintext, this@TrckQApplication)
+                        dataStore.edit { it[prefKey] = encryptedValue }
+                        plaintext
+                    }
+                },
+                writeKeyVerifier = { writeKey ->
+                    // Optional: Add custom WriteKey validation
+                    WriteKeyValidator.validate(writeKey, this).let { result ->
+                        when (result) {
+                            is WriteKeyValidator.ValidationResult.Valid -> {
+                                WriteKeyValidator.markNonceUsed(writeKey, this)
+                                true
+                            }
+                            else -> false
+                        }
+                    }
                 }
             )
         )
-    }
-
-    private fun generateSecret(): String {
-        val bytes = ByteArray(32)
-        java.security.SecureRandom().nextBytes(bytes)
-        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
     }
 }
 ```
