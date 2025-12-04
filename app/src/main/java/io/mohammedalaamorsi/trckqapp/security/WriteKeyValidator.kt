@@ -1,12 +1,20 @@
 package io.mohammedalaamorsi.trckqapp.security
 
 import android.content.Context
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import android.content.SharedPreferences
+import androidx.core.content.edit
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import io.mohammedalaamorsi.trckq.WriteKey
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
-import androidx.core.content.edit
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+
+private val Context.nonceDataStore by preferencesDataStore(name = "write_key_secure_store")
 
 /**
  * WriteKeyValidator - Demonstrates advanced WriteKey validation features
@@ -51,9 +59,9 @@ object WriteKeyValidator {
      * TEST-ONLY: Corrupt nonce store MAC to simulate tampering.
      * Do not call in production.
      */
-    fun testCorruptNonceStoreMac(context: Context) {
-        val p = prefs(context)
-        p.edit().putString(NONCE_MAC_KEY, "corrupt").apply()
+    fun testCorruptNonceStoreMac(context: Context) = runBlocking {
+        val macKey = stringPreferencesKey(NONCE_MAC_KEY)
+        context.nonceDataStore.edit { it[macKey] = "corrupt" }
     }
 
     /**
@@ -64,37 +72,20 @@ object WriteKeyValidator {
     /**
      * TEST-ONLY: Reset nonce store and integrity MAC.
      */
-    fun testResetNonceStore(context: Context) {
-        val p = prefs(context)
-        val editor = p.edit()
-        p.all.keys.filter { it.startsWith("nonce_") || it == NONCE_MAC_KEY }.forEach { editor.remove(it) }
-        editor.apply()
+    fun testResetNonceStore(context: Context) = runBlocking {
+        context.nonceDataStore.edit { preferences ->
+            preferences.asMap().keys.filter {
+                it.name.startsWith("nonce_") || it.name == NONCE_MAC_KEY
+            }.forEach { key ->
+                @Suppress("UNCHECKED_CAST")
+                preferences.remove(key as androidx.datastore.preferences.core.Preferences.Key<Any>)
+            }
+        }
     }
 
-    // Lazy encrypted preferences for nonce persistence (survives process restarts)
-    private var encryptedPrefs: android.content.SharedPreferences? = null
-
+    // SharedPreferences for nonce persistence (survives process restarts)
     private fun prefs(context: Context): android.content.SharedPreferences {
-        encryptedPrefs?.let { return it }
-        return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            val p = EncryptedSharedPreferences.create(
-                context,
-                "write_key_secure_store",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-            encryptedPrefs = p
-            p
-        } catch (e: Exception) {
-            // Fallback to normal SharedPreferences if encryption unavailable
-            val p = context.getSharedPreferences("write_key_fallback_store", Context.MODE_PRIVATE)
-            encryptedPrefs = p
-            p
-        }
+        return context.getSharedPreferences("write_key_secure_store", Context.MODE_PRIVATE)
     }
 
     /**
@@ -425,7 +416,7 @@ object WriteKeyValidator {
 
     private fun updateNonceStoreMac(prefs: android.content.SharedPreferences) {
         val newMac = computeNonceStoreMac(prefs)
-        prefs.edit().putString(NONCE_MAC_KEY, newMac).apply()
+        prefs.edit { putString(NONCE_MAC_KEY, newMac) }
     }
 }
 

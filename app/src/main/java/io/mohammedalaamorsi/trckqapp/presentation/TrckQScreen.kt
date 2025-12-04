@@ -199,7 +199,7 @@ fun LoggedInContent(
         Text("Refresh User Status")
     }
 
-    Divider(modifier = Modifier.padding(vertical = 8.dp))
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
     Text(
         text = "Security Test",
