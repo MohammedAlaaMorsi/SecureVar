@@ -13,7 +13,12 @@ class SecureVarWriter<T>(private val delegate: SecureVarDelegate<T>) {
 // The public function to get the writer from a property reference
 fun <T> secureVar(property: KProperty0<T>): SecureVarWriter<T> {
     property.isAccessible = true
-    val delegate = property.getDelegate() as? SecureVarDelegate<T>
-        ?: throw IllegalArgumentException("Property ${property.name} is not backed by a SecureVarDelegate")
-    return SecureVarWriter(delegate)
+    val delegate = property.getDelegate()
+        ?.let { it as? SecureVarDelegate<*> }
+        ?: throw IllegalArgumentException("Property ${property.name} is not backed by SecureVarDelegate")
+
+    @Suppress("UNCHECKED_CAST")
+    val typed = delegate as SecureVarDelegate<T>
+
+    return SecureVarWriter(typed)
 }

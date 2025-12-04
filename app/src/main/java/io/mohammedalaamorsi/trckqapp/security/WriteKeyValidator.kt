@@ -322,7 +322,8 @@ object WriteKeyValidator {
     ): Boolean {
     val effectiveKey = publicKeyBase64?.takeIf { it.isNotBlank() } ?: PUBLIC_KEY_B64
     if (effectiveKey.isBlank()) return false
-        return try {
+    
+    return try {
             val message = buildString {
                 append(nonce)
                 append(':')

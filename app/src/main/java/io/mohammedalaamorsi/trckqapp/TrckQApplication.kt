@@ -23,7 +23,7 @@ class TrckQApplication : Application() {
         super.onCreate()
         
         // Initialize dependency injection container
-    appContainer = AppContainer(applicationContext)
+        appContainer = AppContainer(applicationContext)
         
         // Initialize TrckqManager with dynamic secret provider
         TrckqManager.initialize(
