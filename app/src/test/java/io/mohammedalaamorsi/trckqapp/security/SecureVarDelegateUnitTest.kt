@@ -5,6 +5,8 @@ import io.mohammedalaamorsi.trckq.WriteKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.reflect.KProperty
+import org.mockito.kotlin.mock
 
 class SecureVarDelegateUnitTest {
 
@@ -12,7 +14,8 @@ class SecureVarDelegateUnitTest {
     fun macTamperDetected() {
         val delegate = SecureVarDelegate(initialValue = 42, propertyName = "testInt")
         // Access value to ensure sealed state
-        val original = delegate.getValue(null, DummyProperty("dummy"))
+        val mockProp = mock<KProperty<Any?>>()
+        val original = delegate.getValue(null, mockProp)
         // Reflectively tamper with internal mac (simulate attacker)
         val field = SecureVarDelegate::class.java.getDeclaredField("state")
         field.isAccessible = true
@@ -21,7 +24,7 @@ class SecureVarDelegateUnitTest {
         val macField = sealedClass.getDeclaredField("mac")
         macField.isAccessible = true
         macField.set(sealed, "badmac")
-        val retrieved = delegate.getValue(null, DummyProperty("dummy"))
+        val retrieved = delegate.getValue(null, mockProp)
         // Should not return the original (will fallback to default)
         assertTrue(retrieved != original)
     }
@@ -30,27 +33,14 @@ class SecureVarDelegateUnitTest {
     fun authorizedWriteChangesValue() {
         val delegate = SecureVarDelegate(initialValue = false, propertyName = "flag")
         val key = WriteKey.generate(secretKey = "app-secret-key", scope = "flag")
-        val before = delegate.getValue(null, DummyProperty("dummy"))
+        
+        val mockProp = mock<KProperty<Any?>>()
+        val before = delegate.getValue(null, mockProp)
+        
         delegate.authorizedWrite(true, key)
-        val after = delegate.getValue(null, DummyProperty("dummy"))
+        
+        val after = delegate.getValue(null, mockProp)
         assertTrue(before is Boolean && after is Boolean)
         assertEquals(true, after)
-    }
-
-    // Minimal KProperty stub for direct delegate calls
-    private class DummyProperty(private val n: String) : kotlin.reflect.KProperty<Any?> {
-        override val name: String get() = n
-        override val annotations: List<Annotation> get() = emptyList()
-        override val isLateinit: Boolean get() = false
-        override val isConst: Boolean get() = false
-        override val isAbstract: Boolean get() = false
-        override val parameters: List<kotlin.reflect.KParameter> get() = emptyList()
-        override fun call(vararg args: Any?): Any? = null
-        override fun callBy(args: Map<kotlin.reflect.KParameter, Any?>): Any? = null
-        override val getter: kotlin.reflect.KProperty.Getter<Any?> get() = throw UnsupportedOperationException()
-        override val returnType: kotlin.reflect.KType get() = kotlin.reflect.typeOf<Any?>()
-        override val typeParameters: List<kotlin.reflect.KTypeParameter> get() = emptyList()
-        override val visibility: kotlin.reflect.KVisibility? get() = kotlin.reflect.KVisibility.PUBLIC
-        override val isSuspend: Boolean get() = false
     }
 }

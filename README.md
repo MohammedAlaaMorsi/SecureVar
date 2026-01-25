@@ -21,60 +21,60 @@ Traditional variable protection approaches use read-only properties or obfuscati
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Application Layer                        │
-│  ┌────────────┐                      ┌─────────────────┐   │
-│  │ SessionMgr │──────────────────────│  SecureVar<T>  │   │
-│  └────────────┘                      └─────────────────┘   │
-│         │                                     │              │
+│                     Application Layer                       │
+│  ┌────────────┐                      ┌─────────────────┐    │
+│  │ SessionMgr │──────────────────────│  SecureVar<T>   │    │
+│  └────────────┘                      └─────────────────┘    │
+│         │                                    │              │
 │         │ authorizedWrite(value, WriteKey)   │              │
 │         └────────────────────────────────────┘              │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Authorization Layer (WriteKey)                  │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  • Nonce (one-time use) + Timestamp + TTL           │  │
-│  │  • HMAC-SHA256 or ECDSA signature                   │  │
-│  │  • Bound to: userId, propertyName, scope            │  │
-│  │  • Replay prevention via nonce store + MAC          │  │
-│  │  • Risk posture enforcement (debugger/root/hook)    │  │
-│  └──────────────────────────────────────────────────────┘  │
+│              Authorization Layer (WriteKey)                 │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  • Nonce (one-time use) + Timestamp + TTL            │   │
+│  │  • HMAC-SHA256 or ECDSA signature                    │   │
+│  │  • Bound to: userId, propertyName, scope             │   │
+│  │  • Replay prevention via nonce store + MAC           │   │
+│  │  • Risk posture enforcement (debugger/root/hook)     │   │
+│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Sealing Layer (SecureVarDelegate)               │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  • AES-GCM-128 encryption (per-instance key)        │  │
-│  │  • HMAC-SHA256 MAC (propertyName:salt:IV:cipher)    │  │
-│  │  • Checksum fallback                                 │  │
-│  │  • Obfuscation (split + noise)                      │  │
-│  │  • Per-instance salt (prevents cross-instance reuse)│  │
-│  └──────────────────────────────────────────────────────┘  │
+│              Sealing Layer (SecureVarDelegate)              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  • AES-GCM-128 encryption (per-instance key)         │   │
+│  │  • HMAC-SHA256 MAC (propertyName:salt:IV:cipher)     │   │
+│  │  • Checksum fallback                                 │   │
+│  │  • Obfuscation (split + noise)                       │   │
+│  │  • Per-instance salt (prevents cross-instance reuse) │   │
+│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Runtime Protection Layer                        │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  • Stack trace origin verification                   │  │
-│  │  • Rate limiting (10 writes/min per variable)       │  │
-│  │  • Tamper detection & alerts                         │  │
-│  │  • Direct assignment rejection                       │  │
-│  └──────────────────────────────────────────────────────┘  │
+│              Runtime Protection Layer                       │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  • Stack trace origin verification                   │   │
+│  │  • Rate limiting (10 writes/min per variable)        │   │
+│  │  • Tamper detection & alerts                         │   │
+│  │  • Direct assignment rejection                       │   │
+│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Secret Management Layer                         │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  • Per-install random secrets (MAC + ENC)           │  │
-│  │  • Google Tink AEAD encryption                      │  │
-│  │  • Android Keystore backing                         │  │
-│  │  • DataStore with encrypted storage                 │  │
-│  │  • Dynamic secret provisioning via SecretProvider   │  │
-│  └──────────────────────────────────────────────────────┘  │
+│              Secret Management Layer                        │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  • Per-install random secrets (MAC + ENC)            │   │
+│  │  • Google Tink AEAD encryption                       │   │
+│  │  • Android Keystore backing                          │   │
+│  │  • DataStore with encrypted storage                  │   │
+│  │  • Dynamic secret provisioning via SecretProvider    │   │
+│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 

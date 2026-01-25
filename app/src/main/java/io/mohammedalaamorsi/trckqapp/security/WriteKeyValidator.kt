@@ -362,24 +362,10 @@ object WriteKeyValidator {
 
     private fun assessRisk(context: Context): Risk {
         testHighRiskOverride?.let { return Risk(it) }
-        var high = false
-        // Debugger attached
-        try { if (android.os.Debug.isDebuggerConnected()) high = true } catch (_: Throwable) {}
-        // Emulator heuristics
-        try {
-            val fp = android.os.Build.FINGERPRINT?.lowercase() ?: ""
-            if (fp.contains("generic") || fp.contains("emulator")) high = true
-        } catch (_: Throwable) {}
-        // Hook frameworks present
-        val suspicious = listOf(
-            "com.frida.server",
-            "com.saurik.substrate.MS",
-            "de.robv.android.xposed.XposedBridge"
-        )
-        for (name in suspicious) {
-            try { Class.forName(name); high = true; break } catch (_: ClassNotFoundException) {}
-        }
-        return Risk(high)
+        
+        // Use the centralized RiskDetector from the library
+        val highRisk = io.mohammedalaamorsi.trckq.risk.RiskDetector.isHighRisk(context)
+        return Risk(highRisk)
     }
 
     // --- Nonce store integrity MAC helpers ---
@@ -417,6 +403,25 @@ object WriteKeyValidator {
     private fun updateNonceStoreMac(prefs: android.content.SharedPreferences) {
         val newMac = computeNonceStoreMac(prefs)
         prefs.edit { putString(NONCE_MAC_KEY, newMac) }
+    }
+
+    /**
+     * Helper to request an integrity token to be sent to the backend.
+     * 
+     * @param context App context
+     * @param nonce Nonce to bind the token to (get this from backend first)
+     * @param cloudProjectNumber Your Google Cloud Project Number
+     */
+    suspend fun getIntegrityToken(
+        context: Context,
+        nonce: String,
+        cloudProjectNumber: Long
+    ): String {
+        return io.mohammedalaamorsi.trckq.integrity.PlayIntegrityManager.requestIntegrityToken(
+            context,
+            nonce,
+            cloudProjectNumber
+        )
     }
 }
 
