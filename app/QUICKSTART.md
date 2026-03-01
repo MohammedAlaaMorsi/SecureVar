@@ -48,7 +48,7 @@ Action: Tap "Attempt Unauthorized Write" (red button)
 Expected:
   - Snackbar: "⚠️ Hack attempt detected! Alert triggered."
   - Premium status UNCHANGED (security maintained)
-  - Console log: 🚨 TrckQ Security Alert: [tamper.set]
+  - Console log: 🚨 SecureVar Security Alert: [tamper.set]
 ```
 
 ## Understanding the Code
@@ -85,7 +85,7 @@ class SessionManager(private val userRepository: UserRepository) {
 sessionManager.isPremiumUser = true
 
 // ❌ If someone bypasses with reflection, this triggers alert:
-// SecureVarDelegate.setValue() → TrckqManager.trigger("tamper.set")
+// SecureVarDelegate.setValue() → SecureVarManager.trigger("tamper.set")
 
 // ✅ Only this works (with server key):
 secureVar(::isPremiumUser).write(true, WriteKey("server-key"))
@@ -95,12 +95,12 @@ secureVar(::isPremiumUser).write(true, WriteKey("server-key"))
 
 ### Android Studio Logcat
 1. Open **Logcat** tab at the bottom
-2. Filter by: `TrckQ` or `Security Alert`
-3. Look for: `🚨 TrckQ Security Alert: [tamper.set]`
+2. Filter by: `SecureVar` or `Security Alert`
+3. Look for: `🚨 SecureVar Security Alert: [tamper.set]`
 
 ### Sample Output
 ```
-🚨 TrckQ Security Alert: {
+🚨 SecureVar Security Alert: {
     accessType=tamper.set, 
     details=Illegal direct assignment to isPremiumUser, 
     timestamp=1699564823000
@@ -168,7 +168,7 @@ Button(onClick = {
 ## Common Issues
 
 ### Issue: Compilation Error in SecureVarDelegate
-**Solution**: Ensure Kotlin reflection is added to `trckq/build.gradle.kts`:
+**Solution**: Ensure Kotlin reflection is added to `securevar/build.gradle.kts`:
 ```gradle
 implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.20")
 ```
@@ -178,8 +178,8 @@ implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.20")
 
 ### Issue: App crashes on startup
 **Solution**: Check:
-1. `AndroidManifest.xml` has `android:name=".TrckQApplication"`
-2. All packages are correctly named `io.mohammedalaamorsi.trckqapp`
+1. `AndroidManifest.xml` has `android:name=".SecureVarApplication"`
+2. All packages are correctly named `io.mohammedalaamorsi.securevarapp`
 
 ### Issue: ViewModel not found
 **Solution**: Ensure dependencies in `app/build.gradle.kts`:

@@ -1,6 +1,6 @@
-# TrckQ Sample App - Clean Architecture Demo
+# SecureVar Sample App - Clean Architecture Demo
 
-This sample app demonstrates the use of TrckQ's secure variable system with clean architecture principles.
+This sample app demonstrates the use of SecureVar's secure variable system with clean architecture principles.
 
 ## Architecture Overview
 
@@ -80,7 +80,7 @@ data class UserProfile(
 The SecureVar system includes:
 - **Obfuscation**: Values are split and obfuscated in memory
 - **Checksums**: Integrity validation on every read
-- **Alert System**: Unauthorized access triggers `TrckqManager.trigger()`
+- **Alert System**: Unauthorized access triggers `SecureVarManager.trigger()`
 
 ### 4. Private Setters
 Kotlin's `private set` prevents even legitimate code from direct assignment:
@@ -109,7 +109,7 @@ var isPremiumUser: Boolean by secureVar(...)
 ### 4. Security Test
 1. Tap "Attempt Unauthorized Write" button
 2. System detects illegal direct assignment
-3. Alert is triggered: `🚨 TrckQ Security Alert: [tamper.set]`
+3. Alert is triggered: `🚨 SecureVar Security Alert: [tamper.set]`
 4. Write is **ignored** - security maintained!
 
 ## Benefits of This Architecture
@@ -129,7 +129,7 @@ var isPremiumUser: Boolean by secureVar(...)
 ## Project Structure
 
 ```
-app/src/main/java/io/mohammedalaamorsi/trckqapp/
+app/src/main/java/io/mohammedalaamorsi/securevarapp/
 ├── data/
 │   ├── model/
 │   │   └── UserProfile.kt
@@ -153,12 +153,12 @@ app/src/main/java/io/mohammedalaamorsi/trckqapp/
 ├── ui/theme/
 │   └── ... (theme files)
 ├── MainActivity.kt
-└── TrckQApplication.kt
+└── SecureVarApplication.kt
 ```
 
 ## Dependencies
 
-- **TrckQ Library**: Local project module (`:trckq`)
+- **SecureVar Library**: Local project module (`:securevar`)
 - **Jetpack Compose**: Modern UI toolkit
 - **Coroutines**: Async operations
 - **ViewModel**: Lifecycle-aware state management

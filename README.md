@@ -1,14 +1,14 @@
-# TrckQ - Secure Variable Library for Android
+# SecureVar - Secure Variable Library for Android
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple.svg)](https://kotlinlang.org)
 
-**TrckQ** is a production-grade Android security library that provides **re-sealable secure variables** with server-authorized write control. Variables are protected by multiple cryptographic layers and can only be modified with time-limited, one-time-use write keys issued by your backend.
+**SecureVar** is a production-grade Android security library that provides **re-sealable secure variables** with server-authorized write control. Variables are protected by multiple cryptographic layers and can only be modified with time-limited, one-time-use write keys issued by your backend.
 
 ## 🎯 Core Concept
 
-Traditional variable protection approaches use read-only properties or obfuscation. TrckQ takes a different approach:
+Traditional variable protection approaches use read-only properties or obfuscation. SecureVar takes a different approach:
 
 - **Variables are writable**, but only through cryptographically validated authorization
 - **Server controls all writes** via time-limited, one-time-use WriteKeys
@@ -117,7 +117,7 @@ Traditional variable protection approaches use read-only properties or obfuscati
 
 ```kotlin
 // settings.gradle.kts
-include(":trckq")
+include(":securevar")
 ```
 
 ### 2. Add dependency to your app module
@@ -125,7 +125,7 @@ include(":trckq")
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation(project(":trckq"))
+    implementation(project(":securevar"))
     
     // Required for encrypted storage
     implementation("androidx.datastore:datastore-preferences:1.1.1")
@@ -135,11 +135,11 @@ dependencies {
 
 ## 🚀 Quick Start
 
-### 1. Initialize TrckQ in your Application class
+### 1. Initialize SecureVar in your Application class
 
 ```kotlin
-class TrckQApplication : Application() {
-    private val dataStore by preferencesDataStore(name = "trckq_secrets")
+class SecureVarApplication : Application() {
+    private val dataStore by preferencesDataStore(name = "securevar_secrets")
     
     override fun onCreate() {
         super.onCreate()
@@ -147,10 +147,10 @@ class TrckQApplication : Application() {
         // Initialize Tink encryption
         EncryptedDataStore.initialize(this)
         
-        // Initialize TrckQ with encrypted secret provider
-        TrckqManager.initialize(
-            TrckqConfig(
-                action = TrckqAction.Alert("https://your-backend.com/security/alert"),
+        // Initialize SecureVar with encrypted secret provider
+        SecureVarManager.initialize(
+            SecureVarConfig(
+                action = SecureVarAction.Alert("https://your-backend.com/security/alert"),
                 secretProvider = object : SecretProvider {
                     override fun getMacSecret(): String = getOrCreateSecret("mac_secret")
                     override fun getEncSecret(propertyName: String): String = getOrCreateSecret("enc_secret")
@@ -161,7 +161,7 @@ class TrckQApplication : Application() {
                         
                         if (encrypted != null) {
                             // Decrypt existing secret
-                            return@runBlocking EncryptedDataStore.decrypt(encrypted, this@TrckQApplication)
+                            return@runBlocking EncryptedDataStore.decrypt(encrypted, this@SecureVarApplication)
                         }
                         
                         // Generate new secret
@@ -170,7 +170,7 @@ class TrckQApplication : Application() {
                         val plaintext = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                         
                         // Encrypt and store
-                        val encryptedValue = EncryptedDataStore.encrypt(plaintext, this@TrckQApplication)
+                        val encryptedValue = EncryptedDataStore.encrypt(plaintext, this@SecureVarApplication)
                         dataStore.edit { it[prefKey] = encryptedValue }
                         plaintext
                     }
@@ -316,9 +316,9 @@ object UserApi {
 ### Custom Tamper Detection
 
 ```kotlin
-TrckqManager.initialize(
-    TrckqConfig(
-        action = TrckqAction.Logout, // Logout user on tamper detection
+SecureVarManager.initialize(
+    SecureVarConfig(
+        action = SecureVarAction.Logout, // Logout user on tamper detection
         secretProvider = mySecretProvider
     )
 )
@@ -354,13 +354,13 @@ class SecureVarDelegate<T>(
 ### Run Unit Tests
 
 ```bash
-./gradlew :trckq:test
+./gradlew :securevar:test
 ```
 
 ### Run Instrumented Tests
 
 ```bash
-./gradlew :trckq:connectedDebugAndroidTest
+./gradlew :securevar:connectedDebugAndroidTest
 ```
 
 ### Test Coverage
@@ -405,22 +405,22 @@ class SecureVarDelegate<T>(
 
 ## 🔧 Configuration Options
 
-### TrckqConfig
+### SecureVarConfig
 
 ```kotlin
-data class TrckqConfig(
-    val action: TrckqAction,           // Alert | Logout | Crash
+data class SecureVarConfig(
+    val action: SecureVarAction,           // Alert | Logout | Crash
     val secretProvider: SecretProvider? // MAC/ENC secret source
 )
 ```
 
-### TrckqAction
+### SecureVarAction
 
 ```kotlin
-sealed class TrckqAction {
-    data class Alert(val url: String) : TrckqAction()  // Send alert to backend
-    object Logout : TrckqAction()                      // Force user logout
-    object Crash : TrckqAction()                       // Crash app immediately
+sealed class SecureVarAction {
+    data class Alert(val url: String) : SecureVarAction()  // Send alert to backend
+    object Logout : SecureVarAction()                      // Force user logout
+    object Crash : SecureVarAction()                       // Crash app immediately
 }
 ```
 
@@ -456,9 +456,9 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ## 🔗 Links
 
-- [GitHub Repository](https://github.com/mohammedalaamorsi/TrckQ)
-- [Issue Tracker](https://github.com/mohammedalaamorsi/TrckQ/issues)
-- [Discussions](https://github.com/mohammedalaamorsi/TrckQ/discussions)
+- [GitHub Repository](https://github.com/mohammedalaamorsi/SecureVar)
+- [Issue Tracker](https://github.com/mohammedalaamorsi/SecureVar/issues)
+- [Discussions](https://github.com/mohammedalaamorsi/SecureVar/discussions)
 
 ---
 

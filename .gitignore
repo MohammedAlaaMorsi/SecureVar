@@ -119,7 +119,7 @@ Thumbs.db
 build/
 */build/
 app/build/
-trckq/build/
+securevar/build/
 
 # Kotlin
 .kotlin/

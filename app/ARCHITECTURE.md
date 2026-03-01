@@ -90,7 +90,7 @@
 10. SecureVarDelegate.authorizedWrite()
     ├─ Validate key: key.isValid()
     ├─ If valid: seal(newValue) → update state
-    └─ If invalid: TrckqManager.trigger("tamper.write")
+    └─ If invalid: SecureVarManager.trigger("tamper.write")
    │
    ▼
 11. Value is now:
@@ -112,7 +112,7 @@ SCENARIO: Attacker tries to bypass premium check
    │
    ▼
 3. SECURITY TRIGGERED:
-   TrckqManager.trigger(
+   SecureVarManager.trigger(
        "tamper.set",
        "Illegal direct assignment to isPremiumUser"
    )
@@ -209,7 +209,7 @@ private fun isTampered(state: SealedState.Sealed<T>): Boolean {
 ```kotlin
 override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
     // This is called for direct assignments
-    TrckqManager.trigger("tamper.set", "Illegal direct assignment")
+    SecureVarManager.trigger("tamper.set", "Illegal direct assignment")
     // Write is IGNORED - security maintained
 }
 ```

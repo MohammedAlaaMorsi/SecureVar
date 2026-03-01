@@ -1,6 +1,6 @@
-# 📚 TrckQ Sample App - Documentation Index
+# 📚 SecureVar Sample App - Documentation Index
 
-Welcome to the TrckQ Sample Application documentation! This app demonstrates the secure variable system in a real-world Android application following Clean Architecture principles.
+Welcome to the SecureVar Sample Application documentation! This app demonstrates the secure variable system in a real-world Android application following Clean Architecture principles.
 
 ## 📖 Documentation Files
 
@@ -146,7 +146,7 @@ User Action → API Call → Server Response + WriteKey
 ## 📁 Source Code Structure
 
 ```
-app/src/main/java/io/mohammedalaamorsi/trckqapp/
+app/src/main/java/io/mohammedalaamorsi/securevarapp/
 ├── data/              # External data sources
 ├── domain/            # Business logic (⭐ SessionManager here)
 ├── presentation/      # UI layer

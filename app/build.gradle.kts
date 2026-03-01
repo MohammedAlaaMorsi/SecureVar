@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "io.mohammedalaamorsi.trckqapp"
+    namespace = "io.mohammedalaamorsi.securevarapp"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.mohammedalaamorsi.trckqapp"
+        applicationId = "io.mohammedalaamorsi.securevarapp"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -66,15 +66,18 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
     buildFeatures {
         compose = true
     }
 }
 
 dependencies {
-    // TrckQ Library
-    implementation(project(":trckq"))
-    
+    implementation(project(":securevar"))
+    // SecureVar Library
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -96,6 +99,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)
     testImplementation(libs.mockito.kotlin)
+    testImplementation("org.robolectric:robolectric:4.11.1")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

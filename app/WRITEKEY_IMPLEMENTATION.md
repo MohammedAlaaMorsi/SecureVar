@@ -28,7 +28,7 @@ I've transformed the simple WriteKey into a **production-grade cryptographic key
 
 ## Files Created
 
-### Core Library (trckq module)
+### Core Library (securevar module)
 - ✅ **SecureVarDelegate.kt** - Enhanced WriteKey class with full implementation
 
 ### Sample App (app module)

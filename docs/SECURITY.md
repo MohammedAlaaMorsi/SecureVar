@@ -12,7 +12,7 @@
 
 ## Overview
 
-TrckQ implements a **defense-in-depth** security architecture with multiple independent layers. Each layer provides protection against different attack vectors, ensuring that compromise of one layer does not compromise the entire system.
+SecureVar implements a **defense-in-depth** security architecture with multiple independent layers. Each layer provides protection against different attack vectors, ensuring that compromise of one layer does not compromise the entire system.
 
 ### Design Principles
 

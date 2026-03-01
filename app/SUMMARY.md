@@ -1,15 +1,15 @@
-# 📱 TrckQ Sample App - Implementation Summary
+# 📱 SecureVar Sample App - Implementation Summary
 
 ## ✅ What Was Built
 
-A complete **Android sample application** following **Clean Architecture** principles to demonstrate and validate the TrckQ `SecureVar` system.
+A complete **Android sample application** following **Clean Architecture** principles to demonstrate and validate the SecureVar `SecureVar` system.
 
 ## 📁 Project Structure
 
 ```
-TrckQ/
+SecureVar/
 ├── app/                                    # Sample Application
-│   └── src/main/java/io/mohammedalaamorsi/trckqapp/
+│   └── src/main/java/io/mohammedalaamorsi/securevarapp/
 │       ├── data/                          # DATA LAYER
 │       │   ├── model/
 │       │   │   └── UserProfile.kt         # API response model with writeKey
@@ -35,14 +35,14 @@ TrckQ/
 │       │   └── AppContainer.kt            # Dependency injection
 │       │
 │       ├── MainActivity.kt                # Entry point
-│       └── TrckQApplication.kt            # Application class
+│       └── SecureVarApplication.kt            # Application class
 │
-└── trckq/                                 # TrckQ Library (existing)
-    └── src/main/java/io/mohammedalaamorsi/trckq/
+└── securevar/                                 # SecureVar Library (existing)
+    └── src/main/java/io/mohammedalaamorsi/securevar/
         ├── SecureVarDelegate.kt           # Enhanced with full implementation
         ├── SecureVarWriter.kt             # Updated to use KProperty0
-        ├── TrckqManager.kt                # Fixed trigger methods
-        ├── trckq.kt                       # Basic honeypot delegate
+        ├── SecureVarManager.kt                # Fixed trigger methods
+        ├── securevar.kt                       # Basic honeypot delegate
         └── WriteKey.kt                    # (defined in SecureVarDelegate.kt)
 ```
 
@@ -50,7 +50,7 @@ TrckQ/
 
 ### 1. SessionManager (Core Demonstration)
 
-Located: `app/src/main/java/io/mohammedalaamorsi/trckqapp/domain/manager/SessionManager.kt`
+Located: `app/src/main/java/io/mohammedalaamorsi/securevarapp/domain/manager/SessionManager.kt`
 
 **Demonstrates the exact pattern from your specification:**
 
@@ -95,7 +95,7 @@ class SessionManager(private val userRepository: UserRepository) {
 - ✅ Compose UI with real-time status updates
 - ✅ Security testing UI (tamper attempt button)
 
-### 3. Enhanced TrckQ Library
+### 3. Enhanced SecureVar Library
 
 #### SecureVarDelegate.kt
 - ✅ Complete implementation with all helper methods
@@ -108,7 +108,7 @@ class SessionManager(private val userRepository: UserRepository) {
 - ✅ Retrieves delegate instance via reflection
 - ✅ Clean API: `secureVar(::property).write(value, key)`
 
-#### TrckqManager.kt
+#### SecureVarManager.kt
 - ✅ Dual trigger signatures for compatibility
 - ✅ Console logging for debugging
 - ✅ Configurable actions (Alert, Logout, Crash)
@@ -156,7 +156,7 @@ UserProfile(
 
 ### Console Output
 ```
-🚨 TrckQ Security Alert: {
+🚨 SecureVar Security Alert: {
     accessType=tamper.set,
     details=Illegal direct assignment to isPremiumUser,
     timestamp=1699564823000
@@ -187,7 +187,7 @@ UserProfile(
 
 ### View Logs
 - Open **Logcat** in Android Studio
-- Filter by `TrckQ` or `Security Alert`
+- Filter by `SecureVar` or `Security Alert`
 - Watch for `🚨` emoji alerts
 
 ## 🔄 Data Flow
@@ -247,7 +247,7 @@ SecureVarDelegate.authorizedWrite()
 - **Architecture**: Clean Architecture + MVVM
 - **Async**: Kotlin Coroutines + Flow
 - **Dependency Injection**: Manual (AppContainer)
-- **Security**: Custom delegate system (TrckQ)
+- **Security**: Custom delegate system (SecureVar)
 
 ## 📊 Comparison: Before vs After
 
@@ -267,7 +267,7 @@ var isPremiumUser: Boolean by secureVar(...)
 
 ## 🎯 Success Criteria Met
 
-✅ Built complete sample app in `trckqapp` package  
+✅ Built complete sample app in `securevarapp` package  
 ✅ Followed Clean Architecture principles  
 ✅ Implemented exact `SessionManager` pattern from spec  
 ✅ Demonstrated server-authorized writes  

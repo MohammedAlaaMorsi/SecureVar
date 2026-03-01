@@ -5,7 +5,7 @@
 ### Screen 1: Initial State (Logged Out)
 ```
 ┌─────────────────────────────────────┐
-│   TrckQ Secure Variable Demo        │
+│   SecureVar Secure Variable Demo        │
 │                                      │
 │  ┌───────────────────────────────┐  │
 │  │        Login                  │  │
@@ -23,7 +23,7 @@
 ### Screen 2: After Login (Free User)
 ```
 ┌─────────────────────────────────────┐
-│   TrckQ Secure Variable Demo        │
+│   SecureVar Secure Variable Demo        │
 │                                      │
 │  ┌───────────────────────────────┐  │
 │  │      User Status              │  │
@@ -59,7 +59,7 @@
 ### Screen 3: After Purchase (Premium User)
 ```
 ┌─────────────────────────────────────┐
-│   TrckQ Secure Variable Demo        │
+│   SecureVar Secure Variable Demo        │
 │                                      │
 │  ┌───────────────────────────────┐  │
 │  │      User Status              │  │
@@ -81,7 +81,7 @@
 ### Screen 4: After Security Test
 ```
 ┌─────────────────────────────────────┐
-│   TrckQ Secure Variable Demo        │
+│   SecureVar Secure Variable Demo        │
 │                                      │
 │  (Same content as Screen 3)          │
 │                                      │
@@ -93,7 +93,7 @@
   Snackbar: "⚠️ Hack attempt detected! Alert triggered."
   
   Console:
-  🚨 TrckQ Security Alert: [tamper.set]
+  🚨 SecureVar Security Alert: [tamper.set]
      Illegal direct assignment to isPremiumUser
 ```
 
@@ -192,7 +192,7 @@ User          UI           ViewModel      UseCase      SessionMgr   Repository  
    │
 3. SecureVarDelegate.setValue() called
    │
-4. TrckqManager.trigger("tamper.set", "Illegal...") ✓
+4. SecureVarManager.trigger("tamper.set", "Illegal...") ✓
    │
 5. Write IGNORED ✓
    │
@@ -285,7 +285,7 @@ User          UI           ViewModel      UseCase      SessionMgr   Repository  
 
 ```
 t=0s    App Launch
-        └─ TrckQApplication.onCreate()
+        └─ SecureVarApplication.onCreate()
            └─ Initialize AppContainer
 
 t=0.5s  MainActivity.onCreate()
@@ -327,7 +327,7 @@ t=25s   User taps "Attempt Unauthorized Write"
         └─ SessionManager.attemptDirectWrite()
 
 t=25.1s SECURITY ALERT TRIGGERED
-        └─ TrckqManager.trigger("tamper.set")
+        └─ SecureVarManager.trigger("tamper.set")
         └─ Write IGNORED
         └─ Console: 🚨 Security Alert
 

@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TrckQ"
+rootProject.name = "SecureVar"
 include(":app")
-include(":trckq")
+include(":securevar")

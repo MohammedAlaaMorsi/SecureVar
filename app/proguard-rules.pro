@@ -21,62 +21,62 @@
 -renamesourcefileattribute SourceFile
 
 # ===========================
-# TrckQ Security Library Rules
+# SecureVar Security Library Rules
 # ===========================
 
-# Keep public API of TrckQ library
--keep public class io.mohammedalaamorsi.trckq.TrckqManager {
+# Keep public API of SecureVar library
+-keep public class io.mohammedalaamorsi.securevar.SecureVarManager {
     public *;
 }
--keep public class io.mohammedalaamorsi.trckq.TrckqConfig {
+-keep public class io.mohammedalaamorsi.securevar.SecureVarConfig {
     *;
 }
--keep public class io.mohammedalaamorsi.trckq.TrckqAction** {
+-keep public class io.mohammedalaamorsi.securevar.SecureVarAction** {
     *;
 }
--keep public interface io.mohammedalaamorsi.trckq.SecretProvider {
+-keep public interface io.mohammedalaamorsi.securevar.SecretProvider {
     *;
 }
--keep public interface io.mohammedalaamorsi.trckq.WriteKeyVerifier {
+-keep public interface io.mohammedalaamorsi.securevar.WriteKeyVerifier {
     *;
 }
 
 # Keep WriteKey class (used for authorization)
--keep public class io.mohammedalaamorsi.trckq.WriteKey {
+-keep public class io.mohammedalaamorsi.securevar.WriteKey {
     public *;
 }
 
 # Keep SecureVarDelegate for reflection/property delegation
--keep public class io.mohammedalaamorsi.trckq.SecureVarDelegate {
+-keep public class io.mohammedalaamorsi.securevar.SecureVarDelegate {
     public *;
     private <fields>;
 }
 
 # Keep helper functions
--keep public class io.mohammedalaamorsi.trckq.TrckqKt {
+-keep public class io.mohammedalaamorsi.securevar.SecureVarKt {
     public *;
 }
 
 # Obfuscate internal crypto implementation but preserve signatures
--keepclassmembers class io.mohammedalaamorsi.trckq.SecureVarDelegate {
+-keepclassmembers class io.mohammedalaamorsi.securevar.SecureVarDelegate {
     private *** encrypt(...);
     private *** decrypt(...);
     private *** createMac(...);
 }
 
 # Keep Application class
--keep public class io.mohammedalaamorsi.trckqapp.TrckQApplication {
+-keep public class io.mohammedalaamorsi.securevarapp.SecureVarApplication {
     public *;
 }
 
 # Keep SessionManager and its properties (uses SecureVarDelegate)
--keep class io.mohammedalaamorsi.trckqapp.domain.manager.SessionManager {
+-keep class io.mohammedalaamorsi.securevarapp.domain.manager.SessionManager {
     public *;
-    private io.mohammedalaamorsi.trckq.SecureVarDelegate *;
+    private io.mohammedalaamorsi.securevar.SecureVarDelegate *;
 }
 
 # Keep all property getters/setters for classes using SecureVarDelegate
--keepclassmembers class io.mohammedalaamorsi.trckqapp.domain.manager.** {
+-keepclassmembers class io.mohammedalaamorsi.securevarapp.domain.manager.** {
     *** getUsername();
     void setUsername(***);
     *** getUserId();
@@ -110,8 +110,8 @@
 -dontnote kotlinx.serialization.AnnotationsKt
 
 # Keep sealed classes
--keep,allowobfuscation,allowshrinking class io.mohammedalaamorsi.trckq.SealedState
--keep,allowobfuscation,allowshrinking class io.mohammedalaamorsi.trckq.SealedState$*
+-keep,allowobfuscation,allowshrinking class io.mohammedalaamorsi.securevar.SealedState
+-keep,allowobfuscation,allowshrinking class io.mohammedalaamorsi.securevar.SealedState$*
 
 # ===========================
 # Android & Jetpack Compose
