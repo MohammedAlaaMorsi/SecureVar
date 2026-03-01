@@ -69,7 +69,7 @@ class SessionManager(private val userRepository: UserRepository) {
         val apiResponse = userRepository.fetchUserProfileWithWriteKey()
         
         // 3. Use authorized writer with server key
-        secureVar(::isPremiumUser).write(
+        isPremiumUserDelegate.authorizedWrite(
             newValue = apiResponse.isPremium,
             key = WriteKey(nonce = apiResponse.writeKey)
         )
@@ -106,7 +106,7 @@ class SessionManager(private val userRepository: UserRepository) {
 #### SecureVarWriter.kt
 - ✅ Uses `KProperty0` for proper property reference handling
 - ✅ Retrieves delegate instance via reflection
-- ✅ Clean API: `secureVar(::property).write(value, key)`
+- ✅ Clean API: `propertyDelegate.authorizedWrite(value, key)`
 
 #### SecureVarManager.kt
 - ✅ Dual trigger signatures for compatibility
@@ -205,7 +205,7 @@ UserRepository → API
     ↓
 Server Response (with writeKey)
     ↓
-secureVar(::property).write(value, key)
+propertyDelegate.authorizedWrite(value, key)
     ↓
 SecureVarDelegate.authorizedWrite()
     ├─ Validate key ✓
@@ -262,7 +262,7 @@ var isPremiumUser = false
 var isPremiumUser: Boolean by secureVar(...)
     private set
 // Attacker: isPremiumUser = true ← BLOCKED!
-// Only: secureVar(::isPremiumUser).write(true, serverKey) ← Works
+// Only: isPremiumUserDelegate.authorizedWrite(true, serverKey) ← Works
 ```
 
 ## 🎯 Success Criteria Met

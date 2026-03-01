@@ -81,7 +81,7 @@
    │
    ▼
 9. AUTHORIZED WRITE:
-   secureVar(::isPremiumUser).write(
+   isPremiumUserDelegate.authorizedWrite(
        newValue = apiResponse.isPremium,
        key = WriteKey(nonce = apiResponse.writeKey)
    )
@@ -243,7 +243,7 @@ var isPremiumUser: Boolean by secureVar(...)
     private set
 
 // Legitimate code:
-secureVar(::isPremiumUser).write(true, serverKey)  // ✓ Success!
+isPremiumUserDelegate.authorizedWrite(true, serverKey)  // ✓ Success!
 
 // Attacker's code:
 isPremiumUser = true  // ✗ BLOCKED! Alert triggered.

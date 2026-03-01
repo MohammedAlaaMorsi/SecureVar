@@ -81,7 +81,7 @@ suspend fun login(email: String, password: String) {
     // Validate before use (optional but recommended)
     if (writeKey.validateAndLog()) {
         // Use the key to update secure variables
-        secureVar(::isPremiumUser).write(
+        isPremiumUserDelegate.authorizedWrite(
             newValue = response.isPremium,
             key = writeKey
         )
@@ -249,7 +249,7 @@ fun testEndToEndFlow() = runTest {
     assertTrue(clientKey.isValid(secretKey = "test-secret"))
     
     // 5. Client uses key to write
-    secureVar(::testProperty).write(
+    testPropertyDelegate.authorizedWrite(
         newValue = true,
         key = clientKey
     )
@@ -354,7 +354,7 @@ if (writeKey.isExpired()) {
 }
 
 // Proceed with operation
-secureVar(::property).write(value, writeKey)
+propertyDelegate.authorizedWrite(value, writeKey)
 ```
 
 ### Logging and Monitoring

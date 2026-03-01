@@ -174,7 +174,7 @@ User          UI           ViewModel      UseCase      SessionMgr   Repository  
    │
 5. API returns: { isPremium: true, writeKey: "abc123" }
    │
-6. secureVar(::isPremiumUser).write(true, WriteKey("abc123"))
+6. isPremiumUserDelegate.authorizedWrite(true, WriteKey("abc123"))
    │
 7. SecureVarDelegate.authorizedWrite()
    ├─ key.isValid() ✓ TRUE
@@ -357,7 +357,7 @@ Returns: UserProfile(isPremium=true, writeKey="xyz")
     ↓
 SessionManager receives response
     ↓
-secureVar(::isPremiumUser).write(true, WriteKey("xyz"))
+isPremiumUserDelegate.authorizedWrite(true, WriteKey("xyz"))
     ↓
 SecureVarWriter.write()
     ↓

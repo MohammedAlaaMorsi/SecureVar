@@ -399,16 +399,19 @@ sequenceDiagram
 4. **Confidentiality**: Variable values encrypted in memory ✅
 5. **Authorization**: Writes require valid server-issued WriteKey ✅
 6. **Instance isolation**: Sealed states not transferable between delegates ✅
+7. **Memory wiping**: Intermediate plaintext Strings zeroed via `SecureMemory` after read ✅
 
 ### Best-Effort Guarantees
 
-1. **Origin enforcement**: Stack trace checks (bypassable with advanced tools) ⚠️
+1. **Origin enforcement**: Multi-signal verification via `OriginVerifier` (stack trace + ClassLoader + APK signature) ⚠️
 2. **Time limits**: Device clock trusted within skew tolerance ⚠️
-3. **Root detection**: Heuristics only (not foolproof) ⚠️
+3. **Root detection**: Enhanced heuristics via `RiskDetector` (Magisk, KernelSU, mount namespaces, native libs) ⚠️
+4. **Hook detection**: Frida/Xposed/Substrate scanning via `/proc/self/maps` and class loading ⚠️
+5. **Plaintext wiping**: String backing arrays zeroed via reflection (JIT/GC may retain copies) ⚠️
 
 ### Non-Guarantees
 
-1. **Server compromise**: If backend is compromised, attacker can issue valid WriteKeys ❌
+1. **Server compromise**: If backend private key is compromised, attacker can issue valid WriteKeys ❌
 2. **Physical access**: Attacker with physical device can extract KeyStore keys (device-dependent) ❌
 3. **OS exploits**: Zero-day vulnerabilities in Android not protected against ❌
 
@@ -417,10 +420,12 @@ sequenceDiagram
 ### Deployment
 
 1. **Use HTTPS**: Always transmit WriteKeys over TLS
-2. **Short TTLs**: Use minimal TTL for WriteKeys (default: 5 minutes)
-3. **Asymmetric signatures**: Enable ECDSA in production (stronger than HMAC)
-4. **Alert monitoring**: Monitor tamper alerts for anomaly detection
-5. **Rate limiting**: Tune limits based on expected usage patterns
+2. **Certificate pinning**: Use `CertificatePinning` helper with backup pins for key rotation
+3. **Short TTLs**: Use minimal TTL for WriteKeys (default: 5 minutes)
+4. **Asymmetric signatures**: Enable ECDSA in production (stronger than HMAC)
+5. **Alert monitoring**: Monitor tamper alerts for anomaly detection
+6. **Rate limiting**: Tune limits based on expected usage patterns
+7. **Origin verification**: Configure `OriginVerifier` with APK signature pins in production
 
 ### Key Management
 
@@ -428,6 +433,14 @@ sequenceDiagram
 2. **Separate keys**: Use different keys for MAC and encryption
 3. **Backend key security**: Protect HMAC/ECDSA keys with HSM or KMS
 4. **No hardcoded secrets**: All secrets provisioned at runtime
+5. **Backup certificate pins**: Always include next certificate's pin for rotation
+
+### Runtime Protection
+
+1. **Risk callbacks**: Register `onRiskDetected` to handle compromised environments
+2. **Origin verifier**: Use `OriginVerifier.Builder` with `pinSignature()` for APK integrity
+3. **Secure scopes**: Use `SecureMemory.withSecureScope` for sensitive operations
+4. **Debuggable check**: Ensure `FLAG_DEBUGGABLE` is not set in release builds
 
 ### Testing
 
@@ -435,15 +448,16 @@ sequenceDiagram
 2. **Fuzzing**: Test WriteKey validation with malformed inputs
 3. **Tamper testing**: Verify detection of manual state modifications
 4. **Replay testing**: Confirm nonces rejected on second use
+5. **Risk detection testing**: Verify `RiskDetector.getDetailedRiskReport()` on various device profiles
 
 ### Monitoring
 
 1. **Alert aggregation**: Collect tamper alerts in SIEM
 2. **Anomaly detection**: Flag users with high tamper attempt rates
-3. **Device fingerprinting**: Track suspicious device characteristics
+3. **Device fingerprinting**: Track suspicious device characteristics via `RiskReport`
 4. **Backend correlation**: Cross-reference client tamper alerts with server logs
 
 ---
 
-**Last Updated**: 2025-11-09  
-**Version**: 1.0.0
+**Last Updated**: 2026-03-01  
+**Version**: 2.0.0

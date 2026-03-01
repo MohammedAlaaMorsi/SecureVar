@@ -1,5 +1,6 @@
 package io.mohammedalaamorsi.securevar
 
+import io.mohammedalaamorsi.securevar.memory.SecureMemory
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -38,15 +39,32 @@ class SecureVarDelegate<T>(
         if (currentState is SealedState.Sealed) {
             if (isTampered(currentState)) {
                 SecureVarManager.trigger("tamper.get", propertyName)
-                // Return the value from the last known good state, or the initial default.
                 val initialState = seal(getDefaultValue())
-                return reconstructValue(initialState)
+                return reconstructAndWipe(initialState)
             }
-            return reconstructValue(currentState)
+            return reconstructAndWipe(currentState)
         }
-        // Fallback, should not happen if initialized correctly
         val initialState = seal(getDefaultValue())
-        return reconstructValue(initialState)
+        return reconstructAndWipe(initialState)
+    }
+
+    /**
+     * Reconstruct the plaintext value and best-effort wipe intermediate
+     * String copies to minimise the plaintext exposure window in memory.
+     */
+    private fun reconstructAndWipe(st: SealedState.Sealed<T>): T {
+        return SecureMemory.withSecureScope { scope ->
+            val partAStr = scope.track(st.partA.toString())
+            val partBStr = scope.track(st.partB.toString())
+            val cipherB64 = scope.track(deNoise(partAStr) + deNoise(partBStr))
+            val plain = if (st.encrypted) {
+                scope.track(decrypt(st.ivBase64 ?: return@withSecureScope getDefaultValue(), cipherB64))
+            } else {
+                cipherB64
+            }
+            parseToType(plain)
+            // All tracked strings are wiped automatically on scope exit
+        }
     }
 
     // SET is now intentionally crippled. Direct assignment is FORBIDDEN.
@@ -58,13 +76,33 @@ class SecureVarDelegate<T>(
 
     // The NEW, authorized way to write a value.
     fun authorizedWrite(newValue: T, key: WriteKey) {
-        // Stack trace verification: ensure call originates from allowed package
-        val allowedPrefix = "io.mohammedalaamorsi.securevarapp"
-        val stackOk = Throwable().stackTrace.any { it.className.startsWith(allowedPrefix) }
-        if (!stackOk) {
-            SecureVarManager.trigger("tamper.origin", "Unauthorized call site for $propertyName")
-            return
+        // Multi-signal origin verification via OriginVerifier
+        val verifier = SecureVarManager.originVerifier
+        if (verifier != null) {
+            val result = verifier.verifyDetailed()
+            if (!result.allowed) {
+                SecureVarManager.trigger(
+                    "tamper.origin",
+                    "Origin verification failed for $propertyName: ${result.failureReasons.joinToString(", ")}"
+                )
+                return
+            }
+        } else {
+            // Fallback: simple stack trace check using configured allowed packages
+            val allowedPrefixes = SecureVarManager.allowedCallerPackages
+            if (allowedPrefixes.isNotEmpty()) {
+                val stackOk = Throwable().stackTrace.any { frame ->
+                    allowedPrefixes.any { prefix -> frame.className.startsWith(prefix) }
+                }
+                if (!stackOk) {
+                    SecureVarManager.trigger("tamper.origin", "Unauthorized call site for $propertyName")
+                    return
+                }
+            }
         }
+
+        // Runtime risk check (if context is available)
+        SecureVarManager.checkRiskAndNotify()
 
         // Rate limiting per variable
         if (!allowWriteNow()) {

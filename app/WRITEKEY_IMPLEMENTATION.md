@@ -110,7 +110,7 @@ val writeKey = WriteKey(
 )
 
 if (writeKey.validateAndLog()) {
-    secureVar(::isPremiumUser).write(true, writeKey)
+    isPremiumUserDelegate.authorizedWrite(true, writeKey)
 }
 ```
 

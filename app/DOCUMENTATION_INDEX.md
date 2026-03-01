@@ -126,7 +126,7 @@ var isPremiumUser: Boolean by secureVar(...)
     private set  // Can't be directly assigned
 
 // Only authorized writes work:
-secureVar(::isPremiumUser).write(value, serverKey)
+isPremiumUserDelegate.authorizedWrite(value, serverKey)
 ```
 
 **Learn more:** README.md, ARCHITECTURE.md

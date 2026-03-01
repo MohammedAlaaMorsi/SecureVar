@@ -70,7 +70,7 @@ class SessionManager(private val userRepository: UserRepository) {
         val apiResponse = userRepository.fetchUserProfileWithWriteKey()
         
         // 3️⃣ Use authorized write with server-provided key
-        secureVar(::isPremiumUser).write(
+        isPremiumUserDelegate.authorizedWrite(
             newValue = apiResponse.isPremium,
             key = WriteKey(nonce = apiResponse.writeKey)
         )
@@ -88,7 +88,7 @@ sessionManager.isPremiumUser = true
 // SecureVarDelegate.setValue() → SecureVarManager.trigger("tamper.set")
 
 // ✅ Only this works (with server key):
-secureVar(::isPremiumUser).write(true, WriteKey("server-key"))
+isPremiumUserDelegate.authorizedWrite(true, WriteKey("server-key"))
 ```
 
 ## Viewing Console Logs
@@ -140,7 +140,7 @@ var subscriptionLevel: String by secureVar(
 suspend fun refreshUserStatus() {
     val apiResponse = userRepository.fetchUserProfileWithWriteKey()
     
-    secureVar(::subscriptionLevel).write(
+    subscriptionLevelDelegate.authorizedWrite(
         newValue = apiResponse.subscriptionLevel,  // Add this to UserProfile
         key = WriteKey(nonce = apiResponse.writeKey)
     )
@@ -174,7 +174,7 @@ implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.20")
 ```
 
 ### Issue: "Cannot access private setter"
-**Solution**: This is expected! Use `secureVar(::property).write()` instead.
+**Solution**: This is expected! Use `propertyDelegate.authorizedWrite()` instead.
 
 ### Issue: App crashes on startup
 **Solution**: Check:

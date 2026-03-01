@@ -1,5 +1,7 @@
 package io.mohammedalaamorsi.securevar
 
+import io.mohammedalaamorsi.securevar.risk.RiskDetector
+import io.mohammedalaamorsi.securevar.security.OriginVerifier
 import java.util.concurrent.ConcurrentHashMap
 
 object SecureVarManager {
@@ -9,6 +11,11 @@ object SecureVarManager {
         get() = config?.secretProvider
     internal val writeKeyVerifier: WriteKeyVerifier?
         get() = config?.writeKeyVerifier
+    internal val originVerifier: OriginVerifier?
+        get() = config?.originVerifier
+    internal val allowedCallerPackages: List<String>
+        get() = config?.allowedCallerPackages ?: emptyList()
+
     // A set to track triggered pots to avoid alert storms
     private val triggeredPots = ConcurrentHashMap.newKeySet<String>()
 
@@ -16,12 +23,25 @@ object SecureVarManager {
         this.config = config
     }
 
+    /**
+     * Perform a runtime risk check and invoke the [SecureVarConfig.onRiskDetected]
+     * callback if the device environment is high-risk.
+     * Called automatically by [SecureVarDelegate.authorizedWrite] when a context is available.
+     */
+    internal fun checkRiskAndNotify() {
+        val ctx = config?.context ?: return
+        val callback = config?.onRiskDetected ?: return
+        val report = RiskDetector.getDetailedRiskReport(ctx)
+        if (report.highRisk) {
+            callback.invoke(report)
+        }
+    }
+
     internal fun trigger(
         accessType: String,
         details: String
     ) {
         val currentConfig = config ?: run {
-            // If not configured, just log to console
             println("SecureVar Alert: [$accessType] $details")
             return
         }
@@ -34,21 +54,26 @@ object SecureVarManager {
         }
         triggeredPots.add(key)
 
-        // The action is now executed on a background thread.
-        // The payload is much richer now.
         val alertPayload = mapOf(
             "accessType" to accessType,
             "details" to details,
             "timestamp" to System.currentTimeMillis().toString(),
-            // Add other device/user info here
         )
 
-        // Log the alert
         println("🚨 SecureVar Security Alert: $alertPayload")
-        
-        // Execute the configured action: Alert, Logout, Crash, etc.
-        // For example, for an Alert action:
-        // sendAlert(currentConfig.action.url, alertPayload)
+
+        // Execute the configured action
+        when (val action = currentConfig.action) {
+            is SecureVarAction.Alert -> {
+                // In production, send to action.url via HTTP
+            }
+            is SecureVarAction.Logout -> {
+                // App should register a logout handler
+            }
+            is SecureVarAction.Crash -> {
+                throw SecurityException("SecureVar: Tamper detected — $alertPayload")
+            }
+        }
     }
     
     // Legacy compatibility method
@@ -62,11 +87,26 @@ object SecureVarManager {
     }
 }
 
-// Configuration remains similar
+/**
+ * Configuration for the SecureVar library.
+ *
+ * @param action           Action to take on tamper detection (Alert, Logout, Crash)
+ * @param secretProvider   Provider for MAC/ENC secrets (backed by Keystore in production)
+ * @param writeKeyVerifier Optional custom verifier for server-issued WriteKeys
+ * @param originVerifier   Multi-signal origin verifier (stack trace + ClassLoader + APK signature)
+ * @param allowedCallerPackages  Allowed calling package prefixes for simple stack-trace verification
+ *                               (used as fallback when [originVerifier] is null)
+ * @param context          Application context for runtime risk detection
+ * @param onRiskDetected   Callback invoked when a high-risk environment is detected during write
+ */
 data class SecureVarConfig(
     val action: SecureVarAction,
     val secretProvider: SecretProvider? = null,
-    val writeKeyVerifier: WriteKeyVerifier? = null
+    val writeKeyVerifier: WriteKeyVerifier? = null,
+    val originVerifier: OriginVerifier? = null,
+    val allowedCallerPackages: List<String> = emptyList(),
+    val context: android.content.Context? = null,
+    val onRiskDetected: ((RiskDetector.RiskReport) -> Unit)? = null
 )
 
 sealed class SecureVarAction {

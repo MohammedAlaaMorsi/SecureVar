@@ -46,14 +46,23 @@ isPremiumUser = true  // ❌ Bypassed payment!
 
 ### The Solution: SecureVar
 ```kotlin
-var isPremiumUser: Boolean by secureVar(initialValue = false, propertyName = "isPremiumUser")
-    private set
+private val isPremiumUserDelegate = SecureVarDelegate(
+    initialValue = false,
+    propertyName = "isPremiumUser"
+)
+
+var isPremiumUser: Boolean
+    get() = isPremiumUserDelegate.getValue(this, ::isPremiumUser)
+    private set(value) {
+        // Direct assignment is FORBIDDEN and will be ignored
+        isPremiumUserDelegate.setValue(this, ::isPremiumUser, value)
+    }
 
 // Direct assignment is BLOCKED:
 isPremiumUser = true  // ❌ Triggers security alert!
 
 // Only authorized writes with server-provided keys work:
-secureVar(::isPremiumUser).write(
+isPremiumUserDelegate.authorizedWrite(
     newValue = true,
     key = WriteKey(nonce = "server-generated-key-12345")  // ✓ Authorized!
 )

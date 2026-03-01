@@ -390,27 +390,43 @@ class SecureVarDelegate<T>(
 ✅ **Direct assignment**: `setValue()` rejected, triggers alert  
 ✅ **Replay attacks**: Nonce tracking prevents reuse  
 ✅ **Tampering**: MAC + checksum detect modifications  
+✅ **Key forgery**: HMAC/ECDSA signatures prevent unauthorized write keys  
+✅ **Context escalation**: Signatures bound to specific users, properties, and scopes  
 ✅ **Time manipulation**: TTL + clock skew enforcement  
 ✅ **Unauthorized origins**: Stack trace verification  
 ✅ **Rate abuse**: Per-variable write throttling  
 ✅ **Cross-instance state injection**: Per-instance salt prevents key reuse  
 ✅ **Nonce store tampering**: Integrity MAC detects modifications  
 
-### Limitations
+### Limitations & Mitigations
 
-⚠️ **Root access**: Root users can bypass AndroidKeyStore protections  
-⚠️ **Frida/Xposed**: Runtime hooks can intercept method calls (mitigated by risk posture checks)  
-⚠️ **Physical device access**: Attacker with physical access can extract keys from KeyStore  
-⚠️ **Stack trace spoofing**: Advanced attackers may forge stack traces (rare)  
+| Threat | Mitigation | Residual Risk |
+|--------|-----------|---------------|
+| **Root access** | `RiskDetector` detects Magisk, KernelSU, SU binaries, mount namespace cloaking; triggers risk callback | Root users with advanced cloaking can still bypass |
+| **Frida/Xposed** | `RiskDetector` scans /proc/maps for agent libraries, checks for loaded framework classes, probes default ports | Highly skilled attackers can rename artifacts |
+| **Physical device access** | AndroidKeyStore + Tink encryption; risk callback allows app-level response | Hardware key extraction remains possible on some devices |
+| **Stack trace spoofing** | `OriginVerifier` adds ClassLoader validation + APK signature pinning beyond stack traces | Kernel-level call stack manipulation (extremely rare) |
+| **Plaintext exposure** | `SecureMemory` wipes String backing arrays via reflection; `withSecureScope` auto-wipes on exit | JIT/GC may retain copies briefly |
+| **Server compromise** | `CertificatePinning` helper with backup pins for key rotation; ECDSA signatures require private key | Compromised private key remains out of scope |
 
 ## 🔧 Configuration Options
 
 ### SecureVarConfig
 
 ```kotlin
-data class SecureVarConfig(
-    val action: SecureVarAction,           // Alert | Logout | Crash
-    val secretProvider: SecretProvider? // MAC/ENC secret source
+SecureVarConfig(
+    action = SecureVarAction.Alert("https://your-server.com/alert"),
+    secretProvider = mySecretProvider,                    // MAC/ENC secret source
+    writeKeyVerifier = myWriteKeyVerifier,                // Custom WriteKey validator
+    originVerifier = OriginVerifier.Builder(context)      // Multi-signal origin verification
+        .allowPackage("com.yourapp")
+        .pinSignature("SHA-256:AB:CD:...")
+        .build(),
+    allowedCallerPackages = listOf("com.yourapp"),        // Fallback stack trace prefixes
+    context = applicationContext,                          // For runtime risk detection
+    onRiskDetected = { report ->                          // Risk callback
+        Log.w("SecureVar", "Risk: ${report.details}")
+    }
 )
 ```
 

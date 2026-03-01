@@ -256,7 +256,7 @@ suspend fun validateAndUseWriteKey(response: WriteKeyResponse) {
     // Validate signature
     if (writeKey.isValid(secretKey = getAppSecretKey())) {
         // ✅ Signature verified - use the key
-        secureVar(::isPremiumUser).write(true, writeKey)
+        isPremiumUserDelegate.authorizedWrite(true, writeKey)
     } else {
         // ❌ Signature invalid - reject
         throw SecurityException("Invalid WriteKey signature")
@@ -340,7 +340,7 @@ fun testEndToEndHmacFlow() = runTest {
     assertTrue(clientKey.isValid(secretKey = serverSecret))
     
     // Client uses key
-    secureVar(::testProperty).write(true, clientKey)
+    testPropertyDelegate.authorizedWrite(true, clientKey)
     assertTrue(testProperty)
 }
 ```
