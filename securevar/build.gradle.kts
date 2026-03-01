@@ -34,24 +34,26 @@ android {
 }
 
 dependencies {
+    // Core Android KTX (used for SharedPreferences.edit{} extension)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
     
-    // Kotlin reflection for delegate access
+    // Kotlin reflection for property delegate access
     implementation(libs.kotlin.reflect)
     
-    // WriteKeyValidator dependencies
+    // Nonce persistence via DataStore
     implementation(libs.androidx.datastore.preferences)
+    
+    // Coroutines for async nonce store operations
     implementation(libs.kotlinx.coroutines.android)
     
+    // Google Play Integrity API for device attestation
+    implementation(libs.play.integrity)
+    
+    // Tink encryption for EncryptedDataStore (AES-GCM)
+    implementation(libs.tink.android)
+    
+    // Test dependencies
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    
-    // Google Play Integrity API
-    implementation(libs.play.integrity)
-    
-    // Tink encryption for EncryptedDataStore
-    implementation(libs.tink.android)
 }
