@@ -48,9 +48,11 @@ jobs:
           git config --global user.email "zicoreal@ymail.com"
           git config --global user.name "$GITHUB_ACTOR"
           git tag -a $TAG -m "Release v$TAG"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push origin $TAG
         env:
           TAG: ${{ github.event.inputs.versionName }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release on GitHub
         id: create_release
