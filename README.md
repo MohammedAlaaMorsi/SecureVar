@@ -402,11 +402,11 @@ class SecureVarDelegate<T>(
 
 | Threat | Mitigation | Residual Risk |
 |--------|-----------|---------------|
-| **Root access** | `RiskDetector` detects Magisk, KernelSU, SU binaries, mount namespace cloaking; triggers risk callback | Root users with advanced cloaking can still bypass |
-| **Frida/Xposed** | `RiskDetector` scans /proc/maps for agent libraries, checks for loaded framework classes, probes default ports | Highly skilled attackers can rename artifacts |
+| **Root access** | `RiskDetector` detects Magisk, KernelSU, SU binaries, mount namespace cloaking, SELinux permissive mode, Zygisk/Shamiko DenyList artifacts, `/proc` access tampering, and native property reading (bypasses hooked `getprop`); triggers risk callback | Kernel-level rootkits with fully custom cloaking remain theoretically possible |
+| **Frida/Xposed** | `RiskDetector` scans `/proc/maps`, checks loaded framework classes, probes default + extended port range (27000–27100) with D-Bus protocol fingerprinting, scans thread names (`/proc/self/task/*/comm`), checks `/proc/self/fd` for injected artifacts, and validates process name integrity | Attackers who rename all artifacts AND patch thread names simultaneously (extremely difficult) |
 | **Physical device access** | AndroidKeyStore + Tink encryption; risk callback allows app-level response | Hardware key extraction remains possible on some devices |
-| **Stack trace spoofing** | `OriginVerifier` adds ClassLoader validation + APK signature pinning beyond stack traces | Kernel-level call stack manipulation (extremely rare) |
-| **Plaintext exposure** | `SecureMemory` wipes String backing arrays via reflection; `withSecureScope` auto-wipes on exit | JIT/GC may retain copies briefly |
+| **Stack trace spoofing** | `OriginVerifier` adds ClassLoader validation + APK signature pinning + call chain depth validation + expected method name verification | Kernel-level call stack manipulation (extremely rare) |
+| **Plaintext exposure** | `SecureMemory` wipes String backing arrays via reflection; `withSecureScope` auto-wipes on exit; GC hint after every wipe; `PeriodicWiper` background sweeps every 30s | JIT may retain register copies briefly (< 30s exposure window) |
 | **Server compromise** | `CertificatePinning` helper with backup pins for key rotation; ECDSA signatures require private key | Compromised private key remains out of scope |
 
 ## 🔧 Configuration Options

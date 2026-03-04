@@ -31,7 +31,9 @@ import java.security.MessageDigest
 class OriginVerifier private constructor(
     private val allowedPackages: List<String>,
     private val pinnedSignatureHashes: List<String>,
-    private val appContext: Context?
+    private val appContext: Context?,
+    private val expectedCallDepthRange: IntRange?,
+    private val expectedCallerMethods: List<String>
 ) {
 
     /**
@@ -68,6 +70,16 @@ class OriginVerifier private constructor(
             if (!verifyApkSignature(appContext)) {
                 failures.add("signature:apk_signature_mismatch")
             }
+        }
+
+        // 4. Call chain depth validation
+        if (!verifyCallDepth()) {
+            failures.add("call_depth:outside_expected_range")
+        }
+
+        // 5. Expected caller method verification
+        if (!verifyCallerMethods()) {
+            failures.add("caller_method:expected_method_missing")
         }
 
         return VerificationResult(
@@ -171,11 +183,31 @@ class OriginVerifier private constructor(
         }
     }
 
+    // ── Call depth validation ────────────────────────────────────────────
+
+    private fun verifyCallDepth(): Boolean {
+        val range = expectedCallDepthRange ?: return true // Not configured
+        val depth = Throwable().stackTrace.size
+        return depth in range
+    }
+
+    // ── Caller method verification ──────────────────────────────────────
+
+    private fun verifyCallerMethods(): Boolean {
+        if (expectedCallerMethods.isEmpty()) return true
+        val stackTrace = Throwable().stackTrace
+        return expectedCallerMethods.all { expectedMethod ->
+            stackTrace.any { frame -> frame.methodName == expectedMethod }
+        }
+    }
+
     // ── Builder ─────────────────────────────────────────────────────────
 
     class Builder(private val context: Context? = null) {
         private val packages = mutableListOf<String>()
         private val signatures = mutableListOf<String>()
+        private var callDepthRange: IntRange? = null
+        private val callerMethods = mutableListOf<String>()
 
         /** Add an allowed calling package prefix. */
         fun allowPackage(prefix: String) = apply { packages.add(prefix) }
@@ -186,11 +218,19 @@ class OriginVerifier private constructor(
         /** Pin an APK signing certificate hash (format: "SHA-256:AB:CD:..."). */
         fun pinSignature(hash: String) = apply { signatures.add(hash) }
 
+        /** Set expected call stack depth range. Spoofed stacks often have abnormal depth. */
+        fun expectCallDepth(range: IntRange) = apply { callDepthRange = range }
+
+        /** Add an expected method name that must appear in the call chain. */
+        fun expectCallerMethod(methodName: String) = apply { callerMethods.add(methodName) }
+
         fun build(): OriginVerifier {
             return OriginVerifier(
                 allowedPackages = packages.toList(),
                 pinnedSignatureHashes = signatures.toList(),
-                appContext = context
+                appContext = context,
+                expectedCallDepthRange = callDepthRange,
+                expectedCallerMethods = callerMethods.toList()
             )
         }
     }

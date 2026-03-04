@@ -1,6 +1,11 @@
 package io.mohammedalaamorsi.securevar.memory
 
+import java.lang.ref.WeakReference
 import java.util.Arrays
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 /**
  * Utility for minimising plaintext exposure in memory.
@@ -62,6 +67,18 @@ object SecureMemory {
         if (arr != null) Arrays.fill(arr, '\u0000')
     }
 
+    /**
+     * Hint to the garbage collector to reclaim dead copies of wiped strings.
+     * This is best-effort — the GC is not guaranteed to run immediately, but
+     * it reduces the window during which plaintext copies survive in the heap.
+     */
+    fun hintGC() {
+        try {
+            System.gc()
+            Runtime.getRuntime().gc()
+        } catch (_: Exception) { /* Best effort */ }
+    }
+
     // ── Secure scope ────────────────────────────────────────────────────
 
     /**
@@ -74,6 +91,7 @@ object SecureMemory {
             block(scope)
         } finally {
             scope.wipeAll()
+            hintGC()
         }
     }
 
@@ -103,6 +121,74 @@ object SecureMemory {
             trackedBytes.clear()
             trackedChars.forEach { wipeCharArray(it) }
             trackedChars.clear()
+        }
+    }
+
+    // ── Periodic wiper ──────────────────────────────────────────────────
+
+    /**
+     * A background wiper that periodically wipes all globally tracked weak
+     * references. This reduces the exposure window for long-lived secrets
+     * that outlive their [SecureScope].
+     *
+     * Usage:
+     * ```kotlin
+     * // In Application.onCreate()
+     * SecureMemory.PeriodicWiper.start()
+     *
+     * // Track a string globally
+     * SecureMemory.PeriodicWiper.trackGlobal(sensitiveString)
+     * ```
+     */
+    object PeriodicWiper {
+        private val globalTracked = CopyOnWriteArrayList<WeakReference<String>>()
+        private var scheduler: ScheduledExecutorService? = null
+        private const val DEFAULT_INTERVAL_SECONDS = 30L
+
+        /**
+         * Start the periodic wiper. Safe to call multiple times (idempotent).
+         * @param intervalSeconds Interval between wipe sweeps (default: 30s)
+         */
+        fun start(intervalSeconds: Long = DEFAULT_INTERVAL_SECONDS) {
+            if (scheduler != null) return
+            val exec = Executors.newSingleThreadScheduledExecutor { r ->
+                Thread(r, "SecureMemory-Wiper").apply { isDaemon = true }
+            }
+            exec.scheduleAtFixedRate(
+                { sweepAndWipe() },
+                intervalSeconds,
+                intervalSeconds,
+                TimeUnit.SECONDS
+            )
+            scheduler = exec
+        }
+
+        /** Stop the periodic wiper. */
+        fun stop() {
+            scheduler?.shutdownNow()
+            scheduler = null
+        }
+
+        /** Track a String for periodic background wiping. */
+        fun trackGlobal(str: String) {
+            globalTracked.add(WeakReference(str))
+        }
+
+        private fun sweepAndWipe() {
+            val iterator = globalTracked.iterator()
+            while (iterator.hasNext()) {
+                val ref = iterator.next()
+                val str = ref.get()
+                if (str == null) {
+                    // Already GC'd — remove the weak reference
+                    globalTracked.remove(ref)
+                } else {
+                    wipeString(str)
+                    globalTracked.remove(ref)
+                }
+            }
+            // Hint GC after wipe sweep
+            hintGC()
         }
     }
 }

@@ -83,6 +83,10 @@ object RiskDetector {
         if (checkKernelSU()) { details?.add("root:kernelsu_detected"); detected = true }
         if (checkRootProperties()) { details?.add("root:suspicious_properties"); detected = true }
         if (checkMountNamespaces()) { details?.add("root:mount_namespace_anomaly"); detected = true }
+        if (checkSELinuxPermissive()) { details?.add("root:selinux_permissive"); detected = true }
+        if (checkZygiskDenyList()) { details?.add("root:zygisk_denylist_artifacts"); detected = true }
+        if (checkProcAccessibility()) { details?.add("root:proc_access_restricted"); detected = true }
+        if (checkNativeProperties()) { details?.add("root:native_prop_suspicious"); detected = true }
         return detected
     }
 
@@ -98,6 +102,10 @@ object RiskDetector {
         if (checkXposedClasses()) { details?.add("hook:xposed_classes_loaded"); detected = true }
         if (checkSubstrate()) { details?.add("hook:substrate_detected"); detected = true }
         if (checkNativeHookLibraries()) { details?.add("hook:native_hook_lib_in_maps"); detected = true }
+        if (checkFridaThreadNames()) { details?.add("hook:frida_thread_detected"); detected = true }
+        if (checkFridaPortRange()) { details?.add("hook:frida_nondefault_port"); detected = true }
+        if (checkSuspiciousFileDescriptors()) { details?.add("hook:suspicious_fd"); detected = true }
+        if (checkProcessNameIntegrity()) { details?.add("hook:process_name_tampered"); detected = true }
         return detected
     }
 
@@ -345,6 +353,161 @@ object RiskDetector {
                 }
             }
             false
+        } catch (_: Exception) { false }
+    }
+
+    // ── Advanced root-cloaking detection ────────────────────────────────
+
+    private fun checkSELinuxPermissive(): Boolean {
+        return try {
+            val enforceFile = File("/sys/fs/selinux/enforce")
+            if (!enforceFile.exists()) return false
+            val value = BufferedReader(FileReader(enforceFile)).use { it.readLine()?.trim() }
+            // "0" = permissive (suspicious), "1" = enforcing (normal)
+            value == "0"
+        } catch (_: Exception) { false }
+    }
+
+    private fun checkZygiskDenyList(): Boolean {
+        val zygiskPaths = arrayOf(
+            "/data/adb/modules/zygisksu",
+            "/data/adb/modules/shamiko",
+            "/data/adb/lspd",
+            "/data/adb/modules/riru_lsposed",
+            "/data/adb/modules/zygisk_lsposed",
+            "/data/adb/magisk/denylist",
+            "/data/adb/modules/playintegrityfix"
+        )
+        return zygiskPaths.any { File(it).exists() }
+    }
+
+    private fun checkProcAccessibility(): Boolean {
+        // Root cloakers may restrict /proc access; if we CAN'T read what should
+        // be readable, something is hiding data from us.
+        return try {
+            val maps = File("/proc/self/maps")
+            val status = File("/proc/self/status")
+            val mountinfo = File("/proc/self/mountinfo")
+            // All three should be readable on a normal device
+            if (!maps.canRead() || !status.canRead() || !mountinfo.canRead()) return true
+            // Additionally, if maps is suspiciously small (< 50 lines), it may be filtered
+            val lineCount = BufferedReader(FileReader(maps)).use { reader ->
+                var count = 0
+                while (reader.readLine() != null) count++
+                count
+            }
+            lineCount < 20 // A normal process has many more mapped regions
+        } catch (_: Exception) { false }
+    }
+
+    private fun checkNativeProperties(): Boolean {
+        // Read properties via Android's SystemProperties class (reflection) to bypass
+        // hooked getprop binary. Complements checkRootProperties() which uses getprop.
+        return try {
+            val systemProperties = Class.forName("android.os.SystemProperties")
+            val getMethod = systemProperties.getMethod("get", String::class.java, String::class.java)
+            val debuggable = getMethod.invoke(null, "ro.debuggable", "0") as String
+            val secure = getMethod.invoke(null, "ro.secure", "1") as String
+            val adbRoot = getMethod.invoke(null, "service.adb.root", "0") as String
+            val magiskVersion = getMethod.invoke(null, "ro.magisk.version", "") as String
+            val ksuVersion = getMethod.invoke(null, "ro.kernelsu.version", "") as String
+            debuggable == "1" || secure == "0" || adbRoot == "1" ||
+                magiskVersion.isNotEmpty() || ksuVersion.isNotEmpty()
+        } catch (_: Exception) { false }
+    }
+
+    // ── Advanced hook detection ─────────────────────────────────────────
+
+    private fun checkFridaThreadNames(): Boolean {
+        // Frida injects threads with recognizable names that are harder to
+        // rename than file-path artifacts.
+        return try {
+            val taskDir = File("/proc/self/task")
+            if (!taskDir.exists() || !taskDir.isDirectory) return false
+            val suspiciousNames = listOf("gmain", "gdbus", "gum-js-loop", "frida", "linjector")
+            val dirs = taskDir.listFiles() ?: return false
+            for (tid in dirs) {
+                val commFile = File(tid, "comm")
+                if (!commFile.exists()) continue
+                try {
+                    val threadName = BufferedReader(FileReader(commFile)).use {
+                        it.readLine()?.trim()?.lowercase()
+                    } ?: continue
+                    if (suspiciousNames.any { threadName.contains(it) }) return true
+                } catch (_: Exception) { continue }
+            }
+            false
+        } catch (_: Exception) { false }
+    }
+
+    private fun checkFridaPortRange(): Boolean {
+        // Scan beyond the default Frida ports (27042-27043) to catch
+        // non-default configurations in the 27000-27100 range.
+        return try {
+            for (port in 27000..27100) {
+                if (port == 27042 || port == 27043) continue // Already checked by checkFridaPorts
+                try {
+                    java.net.Socket().use { socket ->
+                        socket.connect(java.net.InetSocketAddress("127.0.0.1", port), 50)
+                        // Connected — check if it speaks the Frida D-Bus protocol
+                        val output = socket.getOutputStream()
+                        // Send AUTH handshake: null byte + "AUTH\r\n" (D-Bus auth start)
+                        output.write(0)
+                        output.write("AUTH\r\n".toByteArray())
+                        output.flush()
+                        socket.soTimeout = 100
+                        val input = socket.getInputStream()
+                        val buf = ByteArray(128)
+                        val read = try { input.read(buf) } catch (_: Exception) { -1 }
+                        if (read > 0) {
+                            val response = String(buf, 0, read)
+                            // D-Bus responses start with "REJECTED" or "OK"
+                            if (response.contains("REJECTED") || response.contains("OK")) return true
+                        }
+                    }
+                } catch (_: Exception) { /* Port closed or no response */ }
+            }
+            false
+        } catch (_: Exception) { false }
+    }
+
+    private fun checkSuspiciousFileDescriptors(): Boolean {
+        // Scan /proc/self/fd symlinks for paths containing frida/injection artifacts
+        return try {
+            val fdDir = File("/proc/self/fd")
+            if (!fdDir.exists() || !fdDir.isDirectory) return false
+            val suspiciousTokens = listOf("frida", "gadget", "linjector", "xposed", "substrate")
+            val fds = fdDir.listFiles() ?: return false
+            for (fd in fds) {
+                try {
+                    // readlink via canonical path
+                    val target = fd.canonicalPath.lowercase()
+                    if (suspiciousTokens.any { target.contains(it) }) return true
+                } catch (_: Exception) { continue }
+            }
+            false
+        } catch (_: Exception) { false }
+    }
+
+    private fun checkProcessNameIntegrity(): Boolean {
+        // Compare /proc/self/cmdline with what the Android framework thinks
+        // the process name is. A mismatch indicates process injection.
+        return try {
+            val cmdlineFile = File("/proc/self/cmdline")
+            if (!cmdlineFile.exists()) return false
+            val raw = cmdlineFile.readBytes()
+            // cmdline is null-terminated; take up to first null
+            val nullIdx = raw.indexOf(0.toByte())
+            val cmdline = if (nullIdx >= 0) String(raw, 0, nullIdx) else String(raw)
+            // On Android, the cmdline should match the package name
+            // Use Application.getProcessName() via reflection (API 28+)
+            val appClass = Class.forName("android.app.Application")
+            val getProcessName = try {
+                appClass.getMethod("getProcessName")
+            } catch (_: NoSuchMethodException) { return false }
+            val processName = getProcessName.invoke(null) as? String ?: return false
+            // If cmdline doesn't start with the process name, something is wrong
+            !cmdline.startsWith(processName)
         } catch (_: Exception) { false }
     }
 
