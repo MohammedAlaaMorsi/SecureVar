@@ -1,10 +1,23 @@
 # SecureVar - Secure Variable Library for Android
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.mohammedalaamorsi/securevar.svg)](https://central.sonatype.com/artifact/io.github.mohammedalaamorsi/securevar)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple.svg)](https://kotlinlang.org)
+[![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://developer.android.com/about/versions/nougat)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.2+-purple.svg)](https://kotlinlang.org)
 
 **SecureVar** is a production-grade Android security library that provides **re-sealable secure variables** with server-authorized write control. Variables are protected by multiple cryptographic layers and can only be modified with time-limited, one-time-use write keys issued by your backend.
+
+## 📦 Installation
+
+Add the Maven Central dependency to your app's `build.gradle.kts`:
+
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    implementation("io.github.mohammedalaamorsi:securevar:0.0.3")
+}
+```
 
 ## 🎯 Core Concept
 
@@ -14,6 +27,7 @@ Traditional variable protection approaches use read-only properties or obfuscati
 - **Server controls all writes** via time-limited, one-time-use WriteKeys
 - **Multi-layer protection** prevents tampering, replay attacks, and unauthorized modifications
 - **Zero-trust architecture** assumes the client is compromised and validates everything
+- **Runtime threat detection** actively monitors for root, hooking, and debugging
 
 ## 🔐 Security Architecture
 
@@ -58,10 +72,12 @@ Traditional variable protection approaches use read-only properties or obfuscati
 ┌─────────────────────────────────────────────────────────────┐
 │              Runtime Protection Layer                       │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  • Stack trace origin verification                   │   │
+│  │  • OriginVerifier: stack trace + ClassLoader + APK   │   │
+│  │    signature + call depth + caller method checks     │   │
+│  │  • RiskDetector: root/hook/emulator/debugger scan    │   │
+│  │  • SecureMemory: plaintext wiping + GC hints         │   │
 │  │  • Rate limiting (10 writes/min per variable)        │   │
 │  │  • Tamper detection & alerts                         │   │
-│  │  • Direct assignment rejection                       │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
          │
@@ -78,60 +94,65 @@ Traditional variable protection approaches use read-only properties or obfuscati
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Security Features
+### Implemented Security Features
 
-#### 1. **Server-Issued Authorization (WriteKey)**
-- **One-time use**: Nonces are tracked and rejected on replay
+#### 1. Server-Issued Authorization (WriteKey)
+- **One-time use**: Nonces tracked and rejected on replay
 - **Time-limited**: TTL enforcement with configurable clock skew tolerance
 - **Cryptographically signed**: HMAC-SHA256 or ECDSA (asymmetric preferred)
 - **Context-bound**: Signatures include userId, propertyName, and scope
 - **Risk-aware**: High-risk environments (debugger/root) require asymmetric signatures
 
-#### 2. **Local Sealing (SecureVarDelegate)**
+#### 2. Local Sealing (SecureVarDelegate)
 - **AES-GCM encryption**: 128-bit authentication tag, unique IV per write
 - **Per-instance keys**: Derived from `SHA-256(encSecret:propertyName:instanceSalt)`
 - **MAC protection**: HMAC-SHA256 over `propertyName:instanceSalt:IV:ciphertext`
 - **Tamper detection**: MAC + checksum dual verification
 - **Obfuscation**: Split value + random noise for additional depth
 
-#### 3. **Replay Prevention**
+#### 3. Replay Prevention
 - **Nonce store**: Persistent encrypted SharedPreferences
 - **Integrity MAC**: HMAC over canonical nonce list (detects store tampering)
 - **Automatic cleanup**: Expired nonces pruned on validation
 
-#### 4. **Runtime Protection**
-- **Origin enforcement**: Stack trace verification (allowed package prefixes)
-- **Rate limiting**: Configurable per-variable write throttling (default: 10/min)
-- **Direct assignment rejection**: `setValue()` triggers tamper alert and ignores write
+#### 4. Runtime Threat Detection (RiskDetector)
 
-#### 5. **Dynamic Secret Management**
+| Category | Checks |
+|----------|--------|
+| **Root detection** | SU binaries, Magisk, KernelSU, root build tags, suspicious system properties, mount namespace cloaking, SELinux permissive mode, Zygisk/Shamiko DenyList artifacts, `/proc` access tampering, native property reading (bypasses hooked `getprop`) |
+| **Hook detection** | Frida port scanning (default + range 27000–27100 with D-Bus fingerprinting), `/proc/maps` agent library scanning, Frida gadget class loading, Xposed/EdXposed/LSPosed class detection, Substrate detection, native hook libraries, thread name scanning (`/proc/self/task/*/comm` for `gmain`, `gdbus`, `gum-js-loop`), suspicious file descriptor scanning (`/proc/self/fd`), process name integrity check |
+| **Emulator detection** | Build fingerprint, hardware, manufacturer, model, and product heuristics |
+| **Debugger detection** | `Debug.isDebuggerConnected()`, TracerPid in `/proc/self/status`, `ApplicationInfo.FLAG_DEBUGGABLE` |
+| **Package scanning** | Detects installed root managers, hooking frameworks, and reverse engineering tools |
+
+#### 5. Origin Verification (OriginVerifier)
+- **Stack trace analysis**: Validates calling package prefixes
+- **ClassLoader validation**: Detects custom/injected ClassLoaders
+- **APK signature pinning**: SHA-256 signing certificate verification
+- **Call depth validation**: Rejects calls with abnormal stack depth (spoofed stacks)
+- **Caller method verification**: Requires specific method names in the call chain
+
+#### 6. Memory Protection (SecureMemory)
+- **String wiping**: Reflection-based zeroing of `String` backing `byte[]`/`char[]` arrays
+- **Byte/Char array wiping**: Direct zero-fill utilities
+- **SecureScope**: Auto-wipes all tracked secrets on scope exit
+- **GC hints**: Triggers garbage collection after wipe to reduce plaintext window
+- **PeriodicWiper**: Background daemon thread sweeps globally tracked weak references every 30 seconds
+
+#### 7. Certificate Pinning (CertificatePinning)
+- **Framework-agnostic**: Works with `HttpsURLConnection`, OkHttp, Ktor, and others
+- **SHA-256 SPKI pinning**: Validates server certificate public key hashes
+- **Backup pins**: Supports certificate rotation without breaking existing installs
+- **Subdomain support**: Optional `*.hostname` matching
+- **Pin computation helper**: `computePin()` for discovering pins during development
+
+#### 8. Dynamic Secret Management
 - **Per-install secrets**: Random 32-byte Base64 secrets generated once
 - **Encrypted storage**: Google Tink AEAD with AES256-GCM
 - **Hardware-backed**: Android Keystore integration
 - **DataStore**: Modern async preferences with encryption layer
 - **SecretProvider**: Runtime interface for MAC/ENC secret retrieval
 
-## 📦 Installation
-
-### 1. Add the library module to your project
-
-```kotlin
-// settings.gradle.kts
-include(":securevar")
-```
-
-### 2. Add dependency to your app module
-
-```kotlin
-// app/build.gradle.kts
-dependencies {
-    implementation(project(":securevar"))
-    
-    // Required for encrypted storage
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("com.google.crypto.tink:tink-android:1.15.0")
-}
-```
 
 ## 🚀 Quick Start
 
@@ -147,6 +168,9 @@ class SecureVarApplication : Application() {
         // Initialize Tink encryption
         EncryptedDataStore.initialize(this)
         
+        // Start periodic memory wiper (recommended)
+        SecureMemory.PeriodicWiper.start()
+        
         // Initialize SecureVar with encrypted secret provider
         SecureVarManager.initialize(
             SecureVarConfig(
@@ -160,23 +184,30 @@ class SecureVarApplication : Application() {
                         val encrypted = dataStore.data.map { it[prefKey] }.first()
                         
                         if (encrypted != null) {
-                            // Decrypt existing secret
                             return@runBlocking EncryptedDataStore.decrypt(encrypted, this@SecureVarApplication)
                         }
                         
-                        // Generate new secret
                         val bytes = ByteArray(32)
                         java.security.SecureRandom().nextBytes(bytes)
                         val plaintext = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                         
-                        // Encrypt and store
                         val encryptedValue = EncryptedDataStore.encrypt(plaintext, this@SecureVarApplication)
                         dataStore.edit { it[prefKey] = encryptedValue }
                         plaintext
                     }
                 },
+                originVerifier = OriginVerifier.Builder(this)
+                    .allowPackage("io.mohammedalaamorsi")
+                    .pinSignature("SHA-256:AB:CD:...")
+                    .expectCallDepth(5..30)
+                    .expectCallerMethod("authorizedWrite")
+                    .build(),
+                context = this,
+                onRiskDetected = { report ->
+                    Log.w("SecureVar", "Risk detected: ${report.details}")
+                    // Handle: logout, wipe data, notify server, etc.
+                },
                 writeKeyVerifier = { writeKey ->
-                    // Optional: Add custom WriteKey validation
                     WriteKeyValidator.validate(writeKey, this).let { result ->
                         when (result) {
                             is WriteKeyValidator.ValidationResult.Valid -> {
@@ -197,7 +228,6 @@ class SecureVarApplication : Application() {
 
 ```kotlin
 class SessionManager {
-    // Delegate pattern: property backed by SecureVarDelegate
     private val isPremiumUserDelegate = SecureVarDelegate(
         initialValue = false,
         propertyName = "isPremiumUser"
@@ -210,33 +240,11 @@ class SessionManager {
             isPremiumUserDelegate.setValue(this, ::isPremiumUser, value)
         }
 
-    private val usernameDelegate = SecureVarDelegate(
-        initialValue = "",
-        propertyName = "username"
-    )
-    
-    var username: String
-        get() = usernameDelegate.getValue(this, ::usernameDelegate)
-        private set(value) {
-            usernameDelegate.setValue(this, ::usernameDelegate, value)
-        }
-
     // Authorized write method - ONLY way to update secure variables
     suspend fun upgradeUserToPremium(userId: String) {
-        // 1. Request WriteKey from your backend
         val writeKey = UserApi.requestPremiumUpgrade(userId)
-        
-        // 2. Validate and apply with authorizedWrite
         isPremiumUserDelegate.authorizedWrite(
             newValue = true,
-            key = writeKey
-        )
-    }
-
-    suspend fun updateUsername(userId: String, newUsername: String) {
-        val writeKey = UserApi.requestUsernameChange(userId, newUsername)
-        usernameDelegate.authorizedWrite(
-            newValue = newUsername,
             key = writeKey
         )
     }
@@ -250,39 +258,30 @@ class SessionManager {
 app.post('/api/writekey/premium-upgrade', async (req, res) => {
     const { userId } = req.body;
     
-    // Validate user is authorized for premium upgrade
     if (!await canUpgradeToPremium(userId)) {
         return res.status(403).json({ error: 'Unauthorized' });
     }
     
-    // Generate WriteKey
     const nonce = crypto.randomBytes(16).toString('hex');
     const timestamp = Date.now();
     const ttlMillis = 5 * 60 * 1000; // 5 minutes
     const propertyName = 'isPremiumUser';
     const scope = 'premium_upgrade';
     
-    // Create HMAC signature
     const message = `${nonce}:${timestamp}:${userId}:${propertyName}:${scope}`;
     const hmacSignature = crypto
         .createHmac('sha256', process.env.APP_SECRET_KEY)
         .update(message)
         .digest('base64');
     
-    // Optional: Create ECDSA signature for high-security scenarios
+    // Optional: ECDSA for high-security
     const sign = crypto.createSign('SHA256');
     sign.update(message);
     const asymSignature = sign.sign(privateKey, 'base64');
     
     res.json({
-        nonce,
-        timestamp,
-        signature: hmacSignature,
-        asymSignature,
-        ttlMillis,
-        userId,
-        propertyName,
-        scope
+        nonce, timestamp, signature: hmacSignature, asymSignature,
+        ttlMillis, userId, propertyName, scope
     });
 });
 ```
@@ -313,6 +312,61 @@ object UserApi {
 
 ## 🔬 Advanced Usage
 
+### Certificate Pinning for WriteKey Endpoints
+
+```kotlin
+val pinConfig = CertificatePinning.PinConfig(
+    hostname = "api.yourapp.com",
+    sha256Pins = setOf("sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+    backupPins = setOf("sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=")
+)
+
+// With HttpsURLConnection
+val connection = URL("https://api.yourapp.com/writekey").openConnection() as HttpsURLConnection
+CertificatePinning.apply(connection, pinConfig)
+
+// With OkHttp
+val okPinner = okhttp3.CertificatePinner.Builder()
+    .add(pinConfig.hostname, *pinConfig.allPins.toTypedArray())
+    .build()
+val client = OkHttpClient.Builder().certificatePinner(okPinner).build()
+```
+
+### Secure Memory Handling
+
+```kotlin
+// Wipe a single string after use
+val secret = decryptSomething()
+useSecret(secret)
+SecureMemory.wipeString(secret)
+
+// Auto-wipe everything in a scope
+SecureMemory.withSecureScope { scope ->
+    val token = scope.track(decryptToken())
+    val key = scope.track(decryptKey())
+    // ... use token and key ...
+}   // Both wiped automatically + GC hint
+
+// Track long-lived secrets for periodic cleanup
+SecureMemory.PeriodicWiper.trackGlobal(sensitiveString)
+```
+
+### Runtime Risk Detection
+
+```kotlin
+// Quick check
+if (RiskDetector.isHighRisk(context)) {
+    // Respond: logout, wipe data, alert server
+}
+
+// Detailed report
+val report = RiskDetector.getDetailedRiskReport(context)
+if (report.highRisk) {
+    Log.w("Security", "Threats: ${report.details}")
+    // e.g., ["root:magisk_detected", "hook:frida_thread_detected", "root:selinux_permissive"]
+}
+```
+
 ### Custom Tamper Detection
 
 ```kotlin
@@ -322,19 +376,6 @@ SecureVarManager.initialize(
         secretProvider = mySecretProvider
     )
 )
-```
-
-### Risk Posture Configuration
-
-```kotlin
-// In WriteKeyValidator, configure risk detection
-WriteKeyValidator.apply {
-    // Force high-risk mode for testing
-    forceHighRisk(true)
-    
-    // Configure public key for asymmetric verification
-    setPublicKey(yourECDSAPublicKey)
-}
 ```
 
 ### Rate Limiting Configuration
@@ -368,7 +409,7 @@ class SecureVarDelegate<T>(
 - ✅ WriteKey validation (nonce, timestamp, signature, replay)
 - ✅ MAC tamper detection
 - ✅ Rate limiting enforcement
-- ✅ Origin verification (stack trace)
+- ✅ Origin verification (stack trace, ClassLoader, APK signature)
 - ✅ Asymmetric signature verification
 - ✅ Nonce store integrity (MAC protection)
 - ✅ Instance collision prevention (same propertyName across delegates)
@@ -381,6 +422,8 @@ class SecureVarDelegate<T>(
 | `authorizedWrite()` | ~2-5ms | WriteKey validation + encryption |
 | WriteKey validation | ~1-3ms | HMAC or ECDSA verify + nonce check |
 | Nonce store MAC | ~0.5ms | HMAC over canonical nonce list |
+| Risk detection | ~50-200ms | Full scan (root + hook + emulator) |
+| Memory wipe | ~0.1ms | Reflection-based backing array zero |
 
 ## 🛡️ Threat Model
 
@@ -393,10 +436,15 @@ class SecureVarDelegate<T>(
 ✅ **Key forgery**: HMAC/ECDSA signatures prevent unauthorized write keys  
 ✅ **Context escalation**: Signatures bound to specific users, properties, and scopes  
 ✅ **Time manipulation**: TTL + clock skew enforcement  
-✅ **Unauthorized origins**: Stack trace verification  
+✅ **Unauthorized origins**: Stack trace + ClassLoader + APK signature verification  
 ✅ **Rate abuse**: Per-variable write throttling  
 ✅ **Cross-instance state injection**: Per-instance salt prevents key reuse  
 ✅ **Nonce store tampering**: Integrity MAC detects modifications  
+✅ **Root/Magisk/KernelSU**: Multi-signal detection with SELinux and Zygisk checks  
+✅ **Frida/Xposed/Substrate**: Thread scanning, port probing, fd inspection  
+✅ **Emulator & debugger**: Build fingerprint and TracerPid detection  
+✅ **Plaintext exposure**: SecureMemory wipe + periodic background sweeps  
+✅ **MITM attacks**: CertificatePinning with backup pin support  
 
 ### Limitations & Mitigations
 
@@ -421,6 +469,8 @@ SecureVarConfig(
     originVerifier = OriginVerifier.Builder(context)      // Multi-signal origin verification
         .allowPackage("com.yourapp")
         .pinSignature("SHA-256:AB:CD:...")
+        .expectCallDepth(5..30)
+        .expectCallerMethod("authorizedWrite")
         .build(),
     allowedCallerPackages = listOf("com.yourapp"),        // Fallback stack trace prefixes
     context = applicationContext,                          // For runtime risk detection
@@ -449,32 +499,49 @@ interface SecretProvider {
 }
 ```
 
+## � Library Structure
+
+```
+securevar/
+├── SecureVarDelegate.kt          # Core delegate with sealing/unsealing
+├── SecureVarManager.kt           # Central config & lifecycle manager
+├── SecureVarWriter.kt            # Type-safe write helpers
+├── WriteKeyValidator.kt          # WriteKey nonce/signature validation
+├── integrity/
+│   ├── PlayIntegrityManager.kt   # Google Play Integrity API
+│   └── WriteKeyIntegrityBundler.kt
+├── memory/
+│   ├── SecureCharArrayDelegate.kt # Char array wrapper
+│   └── SecureMemory.kt           # String wiping + PeriodicWiper
+├── risk/
+│   └── RiskDetector.kt           # Root/hook/emulator/debugger detection
+└── security/
+    ├── CertificatePinning.kt     # MITM protection with backup pins
+    ├── EncryptedDataStore.kt     # Tink AEAD encrypted storage
+    └── OriginVerifier.kt         # Multi-signal origin validation
+```
+
 ## 📚 Documentation
 
 - [Security Architecture](docs/SECURITY.md) - Detailed threat model and cryptographic design
-- [API Reference](docs/API.md) - Complete API documentation
-- [Migration Guide](docs/MIGRATION.md) - Upgrading from previous versions
-- [Best Practices](docs/BEST_PRACTICES.md) - Security recommendations
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- AndroidX Security Crypto for encrypted storage
+- Google Tink for AEAD encryption
+- AndroidX DataStore for modern encrypted storage
+- Google Play Integrity API for device attestation
 - Kotlin coroutines for async operations
-- JUnit and AndroidX Test for testing framework
 
 ## 🔗 Links
 
-- [GitHub Repository](https://github.com/mohammedalaamorsi/SecureVar)
-- [Issue Tracker](https://github.com/mohammedalaamorsi/SecureVar/issues)
-- [Discussions](https://github.com/mohammedalaamorsi/SecureVar/discussions)
+- [GitHub Repository](https://github.com/MohammedAlaaMorsi/SecureVar)
+- [Maven Central](https://central.sonatype.com/artifact/io.github.mohammedalaamorsi/securevar)
+- [Issue Tracker](https://github.com/MohammedAlaaMorsi/SecureVar/issues)
+- [Discussions](https://github.com/MohammedAlaaMorsi/SecureVar/discussions)
 
 ---
 
