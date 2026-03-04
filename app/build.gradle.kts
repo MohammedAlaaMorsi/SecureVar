@@ -76,7 +76,7 @@ android {
 
 dependencies {
 
-    implementation("io.github.mohammedalaamorsi:SecureVar:1.0.0")
+    implementation(project(":securevar"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

@@ -1,3 +1,5 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -58,7 +60,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-import com.vanniktech.maven.publish.SonatypeHost
 
 mavenPublishing {
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
